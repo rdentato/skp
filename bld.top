@@ -1,0 +1,77 @@
+##  (C) by Remo Dentato (rdentato@gmail.com)
+##
+## This software is distributed under the terms of the MIT license:
+##  https://opensource.org/licenses/MIT
+##
+
+## Variables
+
+CC=${CC:-gcc}
+CFLAGS="-O2 -Wall -std=c99"
+AR="ar -r"
+RM="rm -f"
+
+## The variable _EXE allows the same bld script to work
+## on msys (Windows) or Linux.
+
+_EXE=""
+if [ -x "$(which gcc).exe" ] ; then
+_EXE=.exe
+fi
+
+## Default rules
+
+## Compile a set of object files from the corresponding
+## C sorurce files. For example:
+##        cc_obj a.o b.o
+## will compile a.o from a.c and b.o from b.c
+
+cc_obj () {
+  local src
+  local obj
+  local force=0
+
+  if [ "$1" = "-f" ] ; then
+    shift
+    force=1
+  fi
+
+  src=$1
+  while [ "$src" != "" ] ; do
+    src=${src%.*}.c
+    obj=${src%.*}.o
+
+    if [ "$force" = "1" ] ; then $RM $obj ; fi
+
+    bld_old $obj $src && {
+      bld_cmd $CC $CFLAGS -o $obj -c $src
+      if [ "$?" != "0" ]; then return 1; fi
+    }
+    shift
+    src=$1
+  done
+  return 0
+}
+
+## Generate an executable from a set of object files
+## For example:
+##   cc_exe prg a.o b.o c.o
+## will create the executable prg from a.o, b.o and c.o
+
+cc_exe () {
+  local exe
+  local force=""
+
+  if [ "$1" = "-f" ] ; then
+    shift
+    force="-f"
+  fi
+  
+  exe=$1
+  shift
+  cc_obj $force $*
+  if [ "$?" != "0" ]; then return 1; fi
+  bld_cmd $CC -o $exe $*
+}
+
+# echo "bld globals loaded" >&2

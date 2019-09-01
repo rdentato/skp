@@ -1,0 +1,72 @@
+
+# skp
+
+
+## Character class
+
+### Upper and lower case 
+A proper handling of upper/lower case is well beyond the scope of
+this library. Just have a look at the FAQ about case mapping/folding
+(https://unicode.org/faq/casemap_charprop.html) to get how complex
+would it be to deal with the general case.
+I took the decision to restrict the concept of "lower/upper case" to
+the characters mapped in the ASCII range (<0x80). The idea is that 
+skp will most probably be used to deal with computer-related text
+like programming languages, error message, ... It's not intended to 
+be used as a general purpose/multi language pattern matching library.
+
+%l matches a single ASCII lower case character
+P:%l
+S:abcd
+0:a
+
+S:3bce
+0:
+
+S:Abce
+0:
+
+S:àbcd
+0:à
+
+
+%u matches a single ASCII upper case character
+P:%u
+S:ABCD
+0:A
+
+P:%l
+S:àbcd
+0:à
+
+P:%u
+S:àbcd
+0:
+
+P:%(%+%l%)%d%(%+%l%)
+S:abc3defX
+0:abc3def
+1:abc
+2:def
+
+### Range
+
+P:%[m-q%]
+S:np
+0:n
+
+P:%.%[aeiouàèéìòù%]
+S:Nav
+0:Na
+
+P:%.%[aeiouàèéìòù%]
+S:Nàv
+0:Nà
+
+P:%.%[-a%]
+S:Nav
+0:Na
+
+P:%.%[-a%]
+S:N-v
+0:N-
