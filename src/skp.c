@@ -26,7 +26,7 @@ typedef struct {
   int        num_match;
   uint32_t   esc;
   int8_t     nocase;
-  int8_t     utf;
+  int8_t     latin;
   int8_t     inv;
   int8_t     not;
 }  skpargs_t;
@@ -35,11 +35,11 @@ char *skpemptystr = "";
 
 STATIC char *skpmatch(char *str, char *pat, skpargs_t *args_init);
 
-STATIC char *skpencoded(char *str, uint32_t *code_ret, int utf)
+STATIC char *skpencoded(char *str, uint32_t *code_ret, int latin)
 {
   uint32_t chr_code=0;
   chr_code = *((unsigned char *)str);
-  if (*str && utf && (*str++ & 0x80)) {
+  if (*str && (*str++ & 0x80) && (latin==0)) {
     while ((*str & 0xC0) == 0x80) {
       chr_code = (chr_code << 8) | *((unsigned char *)str++);
     }
@@ -50,7 +50,8 @@ STATIC char *skpencoded(char *str, uint32_t *code_ret, int utf)
 
 STATIC char *chkquoted(skpargs_t *args)
 {
-  char *str = args->str_next; 
+  char *start = args->str_next; 
+  char *str = start; 
   char quote;
   uint32_t esc = args->esc;
   quote =*str;
@@ -58,10 +59,11 @@ STATIC char *chkquoted(skpargs_t *args)
     for (str++; *str && *str != quote; str++) {
       if (*str == esc) str++;
     }
-    if (*str) str++;
   }
-  if (!(quote && (quote == '\"' || quote == '\'' || quote == '`'))) 
+  _dbgmsg("QUOTED: '%s' '%s'",start,str);
+  if (str == start || *str != quote) 
     str = NULL;
+  else str++;
   return str;
 }
 
@@ -69,7 +71,7 @@ STATIC char *chkbraced(skpargs_t *args)
 {
   char *s = args->str_next; 
   char b_open = *s;
-  char b_close;
+  char b_close = '\0';
   uint32_t esc = args->esc;
   
   switch (b_open) {
@@ -77,7 +79,6 @@ STATIC char *chkbraced(skpargs_t *args)
     case '[': b_close = ']';  break;
     case '{': b_close = '}';  break;
     case '<': b_close = '>';  break;
-    default : b_close = '\0'; break;
   }
 
   if (b_close) {
@@ -142,33 +143,96 @@ STATIC char *chkhexnumber (skpargs_t *args)
                       char *s = args->str_next; \
                       uint32_t c; \
                       if (*s) { \
-                        char *s_tmp=skpencoded(s,&c,args->utf); \
+                        char *s_tmp=skpencoded(s,&c,args->latin); \
                         if ((t) ^ args->inv) return s_tmp; \
                       } \
                       if (s == args->str_next) s = NULL; \
                       return s; \
                     }
 
-STATIC int islowerlatin(uint32_t c)
+static uint32_t mask_lower[10] = {
+  0x00002000, 0xDE6A0000, 0x9E420000, 0xDE6A0004, 0x00002000, 
+  0xDF7E2001, 0x85000000, 0xD7AA2823, 0x21002100, 0xA7086003, 
+};
+
+STATIC int islowerlatin(uint32_t c,int latin)
 {
-  if ('a' <= c && c <= 'z') return 1;                      // ASCII
-  if (0xDF <= c && c <= 0xFF && c != 0xF7) return 1;       // ISO-8859-1
-  if (0xC39F <= c && c <= 0xC3BF && c != 0xC3B7) return 1; // UTF-8
+  if ('a' <= c && c <= 'z') return 1;                   // ASCII
+  if (latin == 0) { // UTF-8
+    if (0xC39F <= c && c <= 0xC3BF) return  (c != 0xC3B7); // Latin-1
+    if (0xC480 <= c && c <= 0xC4B7) return  (c&1);         // Latin-A
+    if (0xC4B8 <= c && c <= 0xC588) return !(c&1);         // Latin-A
+    if (0xC589 <= c && c <= 0xC5B7) return  (c&1);         // Latin-A
+    if (0xC5B9 <= c && c <= 0xC58E) return !(c&1);         // Latin-A
+  }
+  else {
+    _dbgmsg("c:%02X %08X",c,mask_lower[latin-1]);
+    if (0xAD == c) return 0; // free 0xAD to signal 0xFF usage
+    if (0xFF == c) return (mask_lower[latin-1] & (1<<0x0D));
+    if (0xDF <= c && c <= 0xFE) {
+      if (latin == 3 && (0xF0 == c || 0xE3 ==c)) return 0;
+      if (c == 0xF7) return (mask_lower[latin-1] & 1);
+      else return 1;
+    }
+    if (0xA1 <= c && c <= 0xBF) return !!(mask_lower[latin-1] & (1<<(c-0xA0)));
+  }        
   return 0;
 }
 
-STATIC int isupperlatin(uint32_t c)
+static uint32_t mask_upper[10] = {
+  0x00000000, 0x0000DE6A, 0x00008C42, 0x20005E6A, 0x00000000, 
+  0x0000DF7E, 0x00008500, 0x38159552, 0x50100040, 0x5014944A, 
+};
+
+
+STATIC int isupperlatin(uint32_t c,int latin)
 {
-  if ('A' <= c && c <= 'Z') return 1;                      // ASCII
-  if (0xC0 <= c && c <= 0xDE && c != 0xD7) return 1;       // ISO-8859-1
-  if (0xC380 <= c && c <= 0xC39E && c != 0xC397) return 1; // UTF-8
+  if ('A' <= c && c <= 'Z') return 1;                   // ASCII
+  if (latin == 0){ // UTF-8
+    if (0xC380 <= c && c <= 0xC39E) return (c != 0xC397); // UTF-8 (Latin-1)
+    if (0xC480 <= c && c <= 0xC4B7) return !(c&1);        // UTF-8 (Latin-A)
+    if (0xC4B8 <= c && c <= 0xC588) return  (c&1);        // UTF-8 (Latin-A)
+    if (0xC58A <= c && c <= 0xC5B8) return !(c&1);        // UTF-8 (Latin-A)
+    if (0xC5B9 <= c && c <= 0xC58E) return  (c&1);        // UTF-8 (Latin-A)
+  }
+  else {
+    _dbgmsg("c:%02X %08X",c,mask_upper[latin-1]);
+
+    if (0xC0 <= c && c <= 0xDE) {
+      if (latin == 3 && (0xD0 == c || 0xC3 ==c) ) return 0;
+      if (c == 0xD7) return (mask_lower[latin-1] & 1); // Using mask_lower on purpose!
+      else return 1; 
+    }
+
+    if (0xA1 <= c && c <= 0xBF)
+      return !!(mask_upper[latin-1] & (1UL<<(c-0xA0)));
+  }
+  return 0;
+}
+
+STATIC int isalphalatin(uint32_t c,int latin)
+{
+  if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) return 1;         // ASCII
+  if (latin == 0) { // UTF-8
+    if (0xC380 <= c && c <= 0xC3BF) return (c != 0xC397 && c != 0xC3B7); // UTF-8 (Latin-1)
+    if (0xC480 <= c && c <= 0xC58E) return  1;                           // UTF-8 (Latin-A)
+  }
+  else {
+    if (latin == 3 && (0xF0 == c || 0xE3 ==c || 0xD0 == c || 0xC3 ==c) ) return 0;
+
+    if (0xC0 <= c && c <= 0xFF) 
+      return ((c != 0xD7 || (mask_lower[latin-1] & 1)) && (c != 0xF7 || (mask_lower[latin-1] & 1))); 
+
+    if (0xA1 <= c && c <= 0xBF)
+      return !!((mask_upper[latin-1] | mask_lower[latin-1] ) & (1UL<<(c-0xA0)));
+  }
   return 0;
 }
 
 STATIC int isctrllatin(uint32_t c)
 {
   if (0x01 <= c && c <= 0x1F ) return 1;     // ASCII
-  if (0x80 <= c && c <= 0x9F ) return 1;     // ISO-8859-1
+  if (0x80 <= c && c <= 0x9F ) return 1;     // ISO-8859
   if (0xC280 <= c && c <= 0xC29F ) return 1; // UTF-8
   return 0;
 }
@@ -180,11 +244,11 @@ STATIC int ispacelatin(uint32_t c)
 { return (isblanklatin(c) || '\v' == c || '\f' == c || '\r' == c || '\n' == c); }
 
 CHK_F(chkspace  ,(ispacelatin(c)))
-CHK_F(chkalpha  ,(islowerlatin(c) || isupperlatin(c)))
 CHK_F(chkxdigit ,(ishexdigit(c)))
 CHK_F(chkdigit  ,(isdecdigit(c)))
-CHK_F(chklower  ,(islowerlatin(c)))
-CHK_F(chkupper  ,(isupperlatin(c)))
+CHK_F(chkalpha  ,(isalphalatin(c,args->latin)))
+CHK_F(chklower  ,(islowerlatin(c,args->latin)))
+CHK_F(chkupper  ,(isupperlatin(c,args->latin)))
 CHK_F(chkblank  ,(isblanklatin(c)))
 CHK_F(chkpercent,('%' == c))
 CHK_F(chknoteol ,(c != '\r' && c != '\n'))
@@ -208,6 +272,47 @@ STATIC char *chkline(skpargs_t *args)
   return s;
 }
 
+static unsigned char fold_map[10][32] = {
+ /* Latin-1 */ { 0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA6,0xA7,0xA8,0xA9,0xAA,0xAB,0xAC,0xAD,0xAE,0xAF,
+                 0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBC,0xBD,0xBE,0xBF },
+ /* Latin-2 */ { 0xA0,0xB1,0xA2,0xB3,0xA4,0xB5,0xB6,0xA7,0xA8,0xB9,0xBA,0xBB,0xBC,0xAD,0xBE,0xBF,
+                 0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBC,0xBD,0xBE,0xBF },
+ /* Latin-3 */ { 0xA0,0xB1,0xA2,0xA3,0xA4,0xA5,0xB6,0xA7,0xA8,0xB9,0xBA,0xBB,0xBC,0xAD,0xAE,0xAF,
+                 0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBC,0xBD,0xBE,0xBF },
+ /* Latin-4 */ { 0xA0,0xB1,0xA2,0xB3,0xA4,0xB5,0xB6,0xA7,0xA8,0xB9,0xBA,0xBB,0xBC,0xAD,0xBE,0xAF,
+                 0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBC,0xBF,0xBE,0xBF },
+ /* Latin-5 */ { 0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA6,0xA7,0xA8,0xA9,0xAA,0xAB,0xAC,0xAD,0xAE,0xAF,
+                 0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBC,0xBD,0xBE,0xBF },
+ /* Latin-6 */ { 0xA0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xA7,0xB8,0xB9,0xBA,0xBB,0xBC,0xAD,0xBE,0xBF,
+                 0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBC,0xBD,0xBE,0xBF },
+ /* Latin-7 */ { 0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA6,0xA7,0xB8,0xA9,0xBA,0xAB,0xAC,0xAD,0xAE,0xBF,
+                 0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBC,0xBD,0xBE,0xBF },
+ /* Latin-8 */ { 0xA0,0xA2,0xA2,0xA3,0xA5,0xA5,0xAB,0xA7,0xB8,0xA9,0xBA,0xAB,0xBC,0xAD,0xAE,0xFF,
+                 0xB1,0xB1,0xB3,0xB3,0xB5,0xB5,0xB6,0xB9,0xB8,0xB9,0xBF,0xBB,0xBC,0xBE,0xBE,0xBF },
+ /* Latin-9 */ { 0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA8,0xA7,0xA8,0xA9,0xAA,0xAB,0xAC,0xAD,0xAE,0xAF,
+                 0xB0,0xB1,0xB2,0xB3,0xB8,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBD,0xBD,0xFF,0xBF },
+ /* Latin-10*/ { 0xA0,0xA2,0xA2,0xB3,0xA4,0xA5,0xA8,0xA7,0xA8,0xA9,0xBA,0xAB,0xAE,0xAD,0xAE,0xBF,
+                 0xB0,0xB1,0xB9,0xB3,0xB8,0xB5,0xB6,0xB7,0xB8,0xB9,0xBB,0xBB,0xBD,0xBD,0xFF,0xBF },
+};
+
+STATIC uint32_t foldlatin(uint32_t c, int latin)
+{
+  // int cc = c;  // DEBUG ONLY
+  if (isupperlatin(c,latin)) {
+    if (latin == 0) { // UTF-8
+      if (c == 0xC5B8) c = 0xC3BF;   // U+0178 LATIN CAPITAL LETTER Y WITH DIAERESIS
+      else if (c < 0xC39E) c += 32;
+      else c++;
+    }
+    else { // ISO 8859
+      if (0xA1 <= c && c <= 0xBF) c = fold_map[latin-1][c-0xA0];
+      else c += 32;
+    }
+  }
+  _dbgmsg("fold: Latin-%d %04X -> %04X",latin,cc,c);
+  return c;
+}
+
 STATIC char *chkequal(skpargs_t *args)
 {
   uint32_t b,c;
@@ -215,12 +320,13 @@ STATIC char *chkequal(skpargs_t *args)
   char *s = args->str_next;
   char *p = args->pat_next;
 
-  p = skpencoded(p,&b,args->utf);
-  s = skpencoded(s,&c,args->utf);
+  p = skpencoded(p,&b,args->latin);
+  s = skpencoded(s,&c,args->latin);
   args->pat_end = p;
+
   _dbgmsg("CHKEQ: %08X %08X",b,c);
-  if ((b == c || (args->nocase && (b < 0x80) && (c < 0x80) &&
-                       (tolower(b) == tolower(c)))) ^ args->inv) {
+  if ((b == c || (args->nocase &&
+                  (foldlatin(b,args->latin) == foldlatin(c,args->latin)))) ^ args->inv) {
      return s;
   }
   return NULL;
@@ -283,7 +389,7 @@ STATIC char *chkrange  (skpargs_t *args)
     args->pat_end++;
   }
 
-  str=skpencoded(str, &c, args->utf);
+  str=skpencoded(str, &c, args->latin);
   _dbgmsg("RNG C:%08X pat:'%.*s'",c,(int)(args->pat_end-pat),pat);
   
   if (*pat == '^') { inv=1;  pat++; }
@@ -291,11 +397,11 @@ STATIC char *chkrange  (skpargs_t *args)
   if (!(*pat == '-' && c == '-')) {
     c1 = 0;
     while (pat < args->pat_end) {
-      pat=skpencoded(pat, &c1, args->utf);
+      pat=skpencoded(pat, &c1, args->latin);
       _dbgmsg("RNG C1:%08X pat:'%s'",c1,pat);
       if ( c == c1 ) break; // FOUND
       if (*pat == '-' && pat+1 != args->pat_end) {
-        pat=skpencoded(pat+1, &c2, args->utf);
+        pat=skpencoded(pat+1, &c2, args->latin);
         _dbgmsg("RNG C2:%08X pat:'%s'",c2,pat);
         if (c1<c && c<=c2) break; // FOUND
       }
@@ -472,12 +578,19 @@ STATIC char *skpmatch(char *str, char *pat, skpargs_t *args_init)
       case 'C' : 
       case 'c' : args.nocase = (p_chr =='C') ; args.pat_next++;
                  break;
-
-      case 'U' : 
-      case 'I' : args.utf = (p_chr = 'U'); args.pat_next++;
+ 
+      case 'I' : if (args.pat_next[1] == '0')
+                   args.latin = 10;
+                 else if (args.pat_next[1] == 'U')
+                   args.latin = 0;
+                 else if ( '1' <= args.pat_next[1] && args.pat_next[1] <= '9') {
+                   args.latin = args.pat_next[1]-'0';
+                   args.pat_next+=2;
+                 }
+                 else goto invalid;  // Invalid pattern 
                  break;
                  
-      case 'e' : if (args.pat_next[1] == '\0' || args.pat_next[1] > 0x7F)  goto invalid;  // Invalid pattern 
+      case 'E' : if (args.pat_next[1] == '\0' || args.pat_next[1] > 0x7F)  goto invalid;  // Invalid pattern 
                  args.esc = args.pat_next[1];
                  if (args.esc <= '\n') args.esc = '\0';
                  args.pat_next+=2;
@@ -551,7 +664,7 @@ char *skppattern(char *s, char *pat, skpcapt_t *capt)
   args.esc     = '\\';
   args.nocase  = 0;
   args.inv     = 0;
-  args.utf     = 1;
+  args.latin     = 0;
   args.not     = 0;
   args.pat_err = NULL;
   args.capt    = capt;
@@ -574,7 +687,7 @@ char *skppattern(char *s, char *pat, skpcapt_t *capt)
     args.capt->str[0].start = start;
 
     next = skpmatch(start, pat, &args);
-  } while (!next && anywhere && *(start = skpencoded(start,NULL,args.utf)));
+  } while (!next && anywhere && *(start = skpencoded(start,NULL,args.latin)));
 
   for (int k=0; k<capt->max; k++) {
     if (capt->str[k].end == NULL) capt->str[k].start = NULL;
