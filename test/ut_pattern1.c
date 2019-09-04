@@ -22,17 +22,29 @@ int main(int argc, char *argv[])
    t=skp(s,"p%a");
    dbgchk(t && t[0] == 'u',"t=[%s]",t);
 
-   s="płuto";  // it's not an 'l'!!
+   s="płuto";  // it's not an 'l'
    t=skp(s,"p%.");
    dbgchk(t && t[0] == 'u',"t=[%s]",t);
 
-   s="płuto";  // it's not an 'l'!!
+   s="płuto";  // it's not an 'l'
    t=skp(s,"p%a");
+   dbgchk(t && t[0] == 'u',"t=[%s]",t);
+
+   s="płuto";  // it's not an 'l'
+   t=skp(s,"p%^%a");
    dbgchk(t == NULL,"t=[%s]",t);
 
-   s="płuto";  // it's not an 'l'!!
-   t=skp(s,"p%^%a");
-   dbgchk(t && t[0] == 'u',"t=[%s]",t);
+   s="plùto";  // it's not an 'u' but is Latin-1!!
+   t=skp(s,"pl%.");
+   dbgchk(t && t[0] == 't',"t=[%s]",t);
+
+   s="plùto";  // it's not an 'u' but is Latin-1!!
+   t=skp(s,"pl%a");
+   dbgchk(t && t[0] == 't',"t=[%s]",t);
+
+   s="plùto";  // it's not an 'u' but is Latin-1!!
+   t=skp(s,"pl%^%a");
+   dbgchk(t == NULL,"t=[%s]",t);
 
    s="pippo";
    t=skp(s,"pi%+p");
