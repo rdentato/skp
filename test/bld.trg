@@ -8,21 +8,22 @@ _all () {
   bld tests
 }
 
+setflags_ () {
+  CCFLAGS="$CCFLAGS -I../src -I. -DDEBUG=DBGLVL_TEST"
+}
+
 _tests () {
   local f
   local t
-  CFLAGS="$CFLAGS -I../src -I. -DDEBUG"
 
-  bld_old ../src/skp.o ../src/skp.c ../src/skp.h && {
-    cc_obj -f ../src/skp.o
-  }
+  setflags_
 
   for f in $(ls ut_*.c); do
     t=${f:1}
     t=${t%.*}$_EXE
     echo "Building target: '${t%.*}'" >&2
-    bld_old $t $f ../src/skp.h ../src/skp.o && {
-      cc_exe $t ${f%.*}.o ../src/skp.o
+    bld_old $t $f && {
+      cc_exe $t ${f%.*}.o 
     }
   done
 }
@@ -30,20 +31,17 @@ _tests () {
 _default () {
   local f
   local t
-  CFLAGS="$CFLAGS -I../src -I. -DDEBUG"
+
+  setflags_
 
   case $1 in
     ''|*[!0-9]*)  f=u$1.c ;  t=$1$_EXE ;;
     *)            f=ut_pattern$1.c ; t=t_p$1$_EXE ;;
   esac
-
   
-  bld_old ../src/skp.o ../src/skp.c ../src/skp.h && {
-    cc_obj -f ../src/skp.o
-  }
   echo "Building target: '${t%.*}'" >&2
-  bld_old $t $f ../src/skp.o ../src/skp.h && {
-    cc_exe $t ${f%.*}.o ../src/skp.o
+  bld_old $t $f && {
+    cc_exe $t ${f%.*}.o 
   }
 }
 

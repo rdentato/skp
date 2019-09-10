@@ -9,6 +9,6 @@ _all () {
 }
 
 _clean () {
+  bld -d utl clean
   bld -d test clean
-  rm -d src/skp.o
 }

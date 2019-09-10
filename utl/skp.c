@@ -694,7 +694,7 @@ char *skppattern(char *s, char *pat, skpcapt_t *capt)
   }
 
 
-  _dbgblk {
+  dbgblk {
     for (int k=0; k<capt->max; k++) {
       if (capt->str[k].end)
          dbgmsg("CAPT: %2d \"%.*s\"",k,(int)(capt->str[k].end-capt->str[k].start),capt->str[k].start);

@@ -4,10 +4,15 @@
 ##  https://opensource.org/licenses/MIT
 ##
 
+## This is a tipical bld.top file for C programs
+
 ## Variables
 
 CC=${CC:-gcc}
-CFLAGS="-O2 -Wall -std=c99"
+CCFLAGS="-O2 -Wall -std=c99"
+LNFLAGS=""
+LIBS=""
+DBGFLAGS=""
 AR="ar -r"
 RM="rm -f"
 
@@ -21,36 +26,37 @@ fi
 
 ## Default rules
 
+## This is for programs that use my utl functions
+chk_utl_done=0
+chk_utl () {
+  if [ "$chk_utl_done" = "0" ] ; then
+    if [ -f $bld_top/utl/bld.trg ] ; then 
+      bld -d $bld_top/utl libutl
+      if [ -f $bld_top/utl/utl.h ] ; then CCFLAGS="$CCFLAGS -I $bld_top/utl/" ; fi
+      if [ -f $bld_top/utl/libutl.a ] ; then LIBS="$LIBS -lutl" ; LNFLAGS="$LNFLAGS -L $bld_top/utl/" ; fi
+    fi
+    chk_utl_done=1
+  fi
+}
+
 ## Compile a set of object files from the corresponding
 ## C sorurce files. For example:
 ##        cc_obj a.o b.o
 ## will compile a.o from a.c and b.o from b.c
 
 cc_obj () {
-  local src
+  local src=$1
   local obj
-  local force=0
-
-  if [ "$1" = "-f" ] ; then
-    shift
-    force=1
-  fi
-
-  src=$1
+  chk_utl
   while [ "$src" != "" ] ; do
     src=${src%.*}.c
     obj=${src%.*}.o
-
-    if [ "$force" = "1" ] ; then $RM $obj ; fi
-
     bld_old $obj $src && {
-      bld_cmd $CC $CFLAGS -o $obj -c $src
-      if [ "$?" != "0" ]; then return 1; fi
+      bld_cmd $CC $CCFLAGS $DBGFLAGS -o $obj -c $src
     }
     shift
     src=$1
   done
-  return 0
 }
 
 ## Generate an executable from a set of object files
@@ -59,19 +65,9 @@ cc_obj () {
 ## will create the executable prg from a.o, b.o and c.o
 
 cc_exe () {
-  local exe
-  local force=""
-
-  if [ "$1" = "-f" ] ; then
-    shift
-    force="-f"
-  fi
-  
-  exe=$1
+  local exe=$1
   shift
-  cc_obj $force $*
-  if [ "$?" != "0" ]; then return 1; fi
-  bld_cmd $CC -o $exe $*
+  cc_obj $*
+  bld_cmd $CC $LNFLAGS -o $exe $* $LIBS
 }
 
-# echo "bld globals loaded" >&2

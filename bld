@@ -4,25 +4,29 @@
 ##  https://opensource.org/licenses/MIT
 ##
 
-
-# The bld_old function is borrowed from Akkartik post:
+# This is an implementation of an idea of Kartik Agaram: to get rid
+# of complex build systems (make, cmake, autotools, ...) and use shell
+# scripts to achieve the same goal.
+# Read the  Akkartik post for more details:
 #      https://git.sr.ht/~akkartik/basic-build
-#   (visit his website for great ideas/points to ponder!)
+# (and visit his website for great ideas/points to ponder!)
 
-# BLD_VERSION     0x0001001B
-# BLD_VERSION_STR "0.1.1-beta"
+BLD_VERSION=0x0001002B
+BLD_VERSION_STR="0.1.2-beta"
 
 bld_old () {
   local target="$1"
   local f
   shift
+  if [ "$bld__force" != "" ] ; then 
+    return 0
+  fi
   for f in "$@" ; do
     if [ ! -e $f ] ; then
-      echo "Error: missing dependency '$f'" >&2
-      exit 1
+      echo "Error: missing dependency '$f'" >&2 ; exit 1
     fi
   done
-  if [ ! -e $target ] ; then
+  if [ ! -e $target ] ; then 
     return 0
   fi
   for f in "$@" ; do
@@ -33,20 +37,21 @@ bld_old () {
   return 1
 }
 
-export bld__sh=$(realpath $0)
-
 bld () {
   local t="$1";
+  if [ "$t" = "-f" ] ; then
+    bld__force="-f" ;  shift ; t="$1"
+  fi
   if [ "$t" = "-d" ] ; then
-    $bld__sh $*
+    $bld__sh $bld__force $*
   else
     if [ "$t" = "" ] ; then t=all ; fi
     while [ "$t" != "" ] ; do
       local target="_$t"
-      if [ "`type -t $target`" = "function" ] ; then
+      if [ "$(type -t $target)" = "function" ] ; then
         echo "Building target: '$t'" >&2
         $target
-      elif [ "`type -t _default`" = "function" ] ; then
+      elif [ "$(type -t _default)" = "function" ] ; then
         echo "Building target: '$t'" >&2
         _default $t
       else
@@ -64,57 +69,75 @@ bld_cmd () {
   $cmd
 }
 
+export bld__sh=$(realpath $0)
 bld_sh () {
-  $bld__sh $*
+  $bld__sh $bld__force $*
 }
-
-if [ "$1" = "-h" ] ; then
-  echo "Usage: `basename $0` [-d dir] [target]" >&2
-  exit 0
-fi
 
 bld__dir=$(pwd)
 bld__tdir=""
-echo " -- $bld__dir"
-if [ "$1" = "-d" ] ; then
-  shift
-  bld__tdir=$1
-  if [ -d $bld__tdir ] ; then
-    cd $bld__tdir
-    bld__tdir=$(pwd)
-    echo " -- $bld__tdir"
-    shift
-  else
-    echo "Error: missing directory ('$bld__tdir')" >&2
-    exit 1
-  fi
-fi
+echo " -- $bld__dir" >&2
 
-for f in ./bld.top ../bld.top ../../bld.top ../../../bld.top ../../../../bld.top ; do
+for f in ./bld.top ../bld.top ../../bld.top ; do
   if [ -e $f ] ; then
+    bld_top=$(realpath $(dirname $f))
     . $f
-    bld_top=$(dirname $f)
+    #echo "YYY $bld_top YYY"
     break
   fi
 done
 
 bld__trgfile=bld.trg
-if [ "$1" = "-f" ] ; then
-  shift
-  bld__trgfile=$1
-  shift
-fi
+bld__opts=1
+bld__force=""
 
-if [ -e $bld__trgfile ] ; then
-  . $bld__trgfile
-else
-  echo "Error: missing target file ('$bld__trgfile')" >&2
+while [ $bld__opts = 1 ] ; do
+  case "$1" in 
+    -h)  echo "Usage: $(basename $0) [options] [targets ...]" >&2
+         echo "Version: \"$BLD_VERSION_STR\" ($BLD_VERSION)" >&2 
+         echo "Options: -h              this help" >&2
+         echo "         -f              force rebuild" >&2
+         echo "         -l              list available targets" >&2
+         echo "         -d dir          move to the specified directory before building" >&2
+         echo "         -t file         load the specified target file (default: bld.trg)" >&2
+         echo "         -D \"VAR=VALUE\"  set the variable VAR" >&2
+         echo "Target defaults to 'all'"  >&2 
+         exit 0
+         ;;
+
+    -l)  echo "Build targets in \"$bld__trgfile\":" >&2
+         sed -n -e 's/^ *_\([^ ]*\) *()[ {]*\(#.*\)/   \1:  \2/p' -e 's/^ *_\([^ ]*\) *().*/   \1:/p'  $bld__trgfile
+         exit 0
+         ;;
+
+    -t)  shift ; bld__trgfile=$1 ; shift ;;
+    -D)  shift ; export $1 ; shift ;;
+    -d)  shift
+         bld__tdir=$1
+         if [ -d $bld__tdir ] ; then
+           cd $bld__tdir
+           bld__tdir=$(pwd)
+           echo " -- $bld__tdir" >&2
+           shift
+         else
+           echo "Error: missing directory '$bld__tdir'" >&2 ; exit 1
+         fi
+         ;;
+    -f)  shift ; bld__force="-f" ;;
+
+     *)  bld__opts=0 ;; 
+  esac 
+done
+
+if [ ! -e $bld__trgfile ] ; then
+  echo "Error: missing target file '$bld__trgfile'" >&2
   exit 1
 fi
 
+. $bld__trgfile
 bld $*
 
 if [ "$bld__tdir" != "" ] ; then
-  echo " -- $bld__dir"
+  echo " -- $bld__dir" >&2
   cd $bld__dir
 fi
