@@ -11,8 +11,6 @@ _all () {
 _libutl () {
   UTLH=$(ls|grep ".h$"|grep -v "utl.h")
   UTLC=$(ls|grep ".c$")
-  echo $UTLH
-  echo $UTLC
   bld_old utl.h $UTLH && {
     echo "cat $UTLH > utl.h"
     cat $UTLH > utl.h

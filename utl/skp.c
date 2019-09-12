@@ -21,7 +21,7 @@ typedef struct {
   char      *pat_next;
   char      *pat_end;
   char      *pat_err;
-  skpcapt_t *capt;
+  skp_t *capt;
   int        prv_capt;
   int        num_match;
   uint32_t   esc;
@@ -33,7 +33,7 @@ typedef struct {
 
 char *skpemptystr = "";
 
-STATIC char *skpmatch(char *str, char *pat, skpargs_t *args_init);
+STATIC char *skp_match(char *str, char *pat, skpargs_t *args_init);
 
 STATIC char *skpencoded(char *str, uint32_t *code_ret, int latin)
 {
@@ -362,7 +362,7 @@ STATIC char *chksubmatch(skpargs_t *args)
   } else {
     args->capt->cur = args->prv_capt;
   }
-  str = skpmatch(start, pat, args);
+  str = skp_match(start, pat, args);
   if (str)  {
     _dbgmsg("end: %d '%s'",args->capt->cur,str);
     args->capt->str[args->capt->cur].end = str;
@@ -490,7 +490,7 @@ STATIC char *skpto_alt(char *pat)
 
 #define DO_NEXT_PATTERN args.pat_next++; p_chr='\0'; break
 
-STATIC char *skpmatch(char *str, char *pat, skpargs_t *args_init)
+STATIC char *skp_match(char *str, char *pat, skpargs_t *args_init)
 {
   char *start = str;
   uint32_t p_chr;
@@ -647,17 +647,17 @@ invalid:
   return NULL;
 }
 
-char *skppattern(char *s, char *pat, skpcapt_t *capt)
+char *skpmatch(char *s, char *pat, skp_t *capt)
 {
   int anywhere = 0;
   char *next = NULL;
   char *start = s;
 
   skpargs_t args;
-  skpcapt_t *capt_local = NULL;
+  skp_t *capt_local = NULL;
 
   if (capt == NULL) {
-    capt_local = skpcaptnew(0);
+    capt_local = skpnew(0);
     capt = capt_local;
   }
 
@@ -686,7 +686,7 @@ char *skppattern(char *s, char *pat, skpcapt_t *capt)
     args.capt->cur = 0;
     args.capt->str[0].start = start;
 
-    next = skpmatch(start, pat, &args);
+    next = skp_match(start, pat, &args);
   } while (!next && anywhere && *(start = skpencoded(start,NULL,args.latin)));
 
   for (int k=0; k<capt->max; k++) {
@@ -694,7 +694,7 @@ char *skppattern(char *s, char *pat, skpcapt_t *capt)
   }
 
 
-  dbgblk {
+  _dbgblk {
     for (int k=0; k<capt->max; k++) {
       if (capt->str[k].end)
          dbgmsg("CAPT: %2d \"%.*s\"",k,(int)(capt->str[k].end-capt->str[k].start),capt->str[k].start);
@@ -703,7 +703,7 @@ char *skppattern(char *s, char *pat, skpcapt_t *capt)
     }
   }
 
-  if (capt_local) skpcaptfree(capt_local);
+  if (capt_local) skpfree(capt_local);
 
   if (next == NULL) { 
     args.capt->str[0].start = NULL;

@@ -96,12 +96,13 @@
 #define dbgwrn(...)    if (DEBUG < DBGLVL_WARN) ; else dbgmsg("WARN: " __VA_ARGS__)
 #define dbginf(...)    if (DEBUG < DBGLVL_INFO) ; else dbgmsg("INFO: " __VA_ARGS__)
 
-#define dbgchk(e,...)  if (DEBUG < DBGLVL_TEST) ; else do { int dbg_err=!(e);                                          \
-                          fflush(stdout); /* Ensure dbg_err message appears *after* pending stdout prints */ \
-                          fprintf(stderr,"%s: (%s) \x9%s:%d\n",(dbg_err?"FAIL":"PASS"),#e,__FILE__,__LINE__);\
-                          if (dbg_err && *(dbg_exp(dbg_0(__VA_ARGS__))))                                       \
-                            { fprintf(stderr,"    : " __VA_ARGS__); fputc('\n',stderr); }                    \
-                          fflush(stderr); errno = dbg_err; dbg=0;                                            \
+#define dbgchk(e,...)  if (DEBUG < DBGLVL_TEST) ; \
+                       else do { int dbg_err=!(e);                                          \
+                         fflush(stdout); /* Ensure dbg_err message appears *after* pending stdout prints */ \
+                         fprintf(stderr,"%s: (%s) \x9%s:%d\n",(dbg_err?"FAIL":"PASS"),#e,__FILE__,__LINE__);\
+                         if (dbg_err && *(dbg_exp(dbg_0(__VA_ARGS__))))                                       \
+                           { fprintf(stderr,"    : " __VA_ARGS__); fputc('\n',stderr); }                    \
+                         fflush(stderr); errno = dbg_err; dbg=0;                                            \
                        } while(0)
 
 #define dbgreq(e,...)  do { dbgchk(e,__VA_ARGS__); if (errno) abort();} while(0)

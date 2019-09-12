@@ -6,7 +6,7 @@ Model (each box is a codepoint according the used encoding):
 ```
     nxt=skp(str,pat)
        ___________________
-      /  matched pattern  \
+      /  matches pattern  \
       +--+--+--+--+--+--+--+--+--+--
       |  |  |  |  |  |  |  |  |  | ... 
       +--+--+--+--+--+--+--+--+--+--
@@ -48,7 +48,7 @@ Returns `NULL` if `str` doesn't match the pattern.
   * `%?`  Next pattern is optional
   * `%!`  Match the empty string if next pattern doesn't match
   * `%^`  
-  * `%_`  an optional sequeance of blank characters
+  * `%_`  an optional sequence of blank characters
   * `%a`  an alphabetic character
   * `%B`  a balanced braced string starts with '(', '{' or '['
   * `%C`  set case insensitive comparison
@@ -68,9 +68,10 @@ Returns `NULL` if `str` doesn't match the pattern.
   * `%x`  hex digit
   * `%w`  whitespace (only space, tab and nbsp)
   * `%( ... %)` submatch and capture
+  * `%|`  alternate pattern
   * `%[ ... %]` range (same as in regex)
   * `%1`,...,`%9` captured text.
-  * `%>` matches everywher (not just at the start)
+  * `%>` matches everywhere (not just at the start)
       
 ```
 typedef struct skpcapt_s skpcapt_t;

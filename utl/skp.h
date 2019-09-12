@@ -15,17 +15,17 @@
 #include <stdlib.h> 
 #include <stddef.h>
 
-typedef struct skpcapt_s skpcapt_t;
+typedef struct skp_s skp_t;
 
-static inline skpcapt_t *skpcaptnew(int max);
-#define skpcaptfree free
+static inline skp_t *skpnew(int max);
+#define skpfree free
 
-static inline  int  skpcaptlen(skpcapt_t *capt, int n);
-static inline char *skpcaptstart(skpcapt_t *capt, int n);
+static inline  int  skplen(skp_t *capt, int n);
+static inline char *skpstart(skp_t *capt, int n);
 
-char *skppattern(char *s, char *p, skpcapt_t *capt);
-#define skp(s,...) skppattern(s, skpexp(skp0(__VA_ARGS__,NULL)), \
-                                 skpexp(skp1(__VA_ARGS__,NULL,NULL)))
+char *skpmatch(char *s, char *p, skp_t *capt);
+#define skp(s,...) skpmatch(s, skpexp(skp0(__VA_ARGS__,NULL)), \
+                               skpexp(skp1(__VA_ARGS__,NULL,NULL)))
 
 /******************************************************/
 /***** PRIVATE! DON'T EVEN LOOK BEYOND THIS LINE!!! ***/
@@ -35,25 +35,25 @@ char *skppattern(char *s, char *p, skpcapt_t *capt);
 #define skp0(x,...)   (x)
 #define skp1(y,x,...) (x)
 
-typedef struct skpcapt_s {
+struct skp_s {
   int num;
   int cur;
   int max;
-  struct skpcapt_ptr_s {
+  struct skp_ptr_s {
     char *start;
     char *end;
   } str[0];
-} skpcapt_t;
+};
 
-static inline skpcapt_t *skpcaptnew(int max)
-{ skpcapt_t *capt;
+static inline skp_t *skpnew(int max)
+{ skp_t *capt;
   if (max<2) max = 2;
-  if ((capt=malloc(sizeof(skpcapt_t)+max *sizeof(struct skpcapt_ptr_s))))
+  if ((capt=malloc(sizeof(skp_t)+max *sizeof(struct skp_ptr_s))))
     capt->max = max;  
   return capt;
 }
 
-static inline int skpcaptlen(skpcapt_t *capt, int n)
+static inline int skplen(skp_t *capt, int n)
 {
   if (capt && n<capt->max && capt->str[n].end != NULL ) 
     return capt->str[n].end - capt->str[n].start;
@@ -61,10 +61,18 @@ static inline int skpcaptlen(skpcapt_t *capt, int n)
     return 0;
 }
 
-static inline char *skpcaptstart(skpcapt_t *capt, int n)
+static inline char *skpstart(skp_t *capt, int n)
 {
   if (capt && n<capt->max && capt->str[n].end != NULL ) 
     return capt->str[n].start;
+  else 
+    return "";
+}
+
+static inline char *skpend(skp_t *capt, int n)
+{
+  if (capt && n<capt->max && capt->str[n].end != NULL ) 
+    return capt->str[n].end;
   else 
     return "";
 }
