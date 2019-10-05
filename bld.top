@@ -47,7 +47,7 @@ chk_utl () {
 cc_obj () {
   local src=$1
   local obj
-  chk_utl
+  #chk_utl
   while [ "$src" != "" ] ; do
     src=${src%.*}.c
     obj=${src%.*}.o
