@@ -1,3 +1,14 @@
+a*.
+ xxb
+ csd
+ adsdadasdferqw2ed
+ 
+#(a|b)+((a)(v+)*)
+#(abc)*x(def)+Yè?
+#a(([^0-9]+)[^a-z]*)b
+#a[1-4](cm)?
+#pi(p)+o|plu*to
+#p(i[^l]o|luto)
 #x&=LATIN-7;&=UTF8;&=ISO-8859-13;y
 #y&=L;&=U;&=I;x
 #&=CASE:0;A[B-P]Q
@@ -67,4 +78,4 @@
 #x([a0-9]+|[A-Fa-f]+p|qq)z
 #X(0a+1|9b+8)+Y
 #[^xcaA-B]+
-x(((a𢀔𢀗+𢀔𢀗+v(da𢀔𢀗+ewa.adsdadasdferqw2ed)*(ssadsadè+𢀔𢀗+è+è+èè+èp𢀔𢀗+𢀔𢀗+𢀔𢀗+𢀔𢀗+èpèpèpès)+)+p[𢀔-𢀗]+)*(𢀔𢀗+)+)y(((av(dd)(ss))p[𢀔-𢀗]+)*(𢀔𢀔èéèé?ò.òòçççòòòçç𢀗+𢀗+)+)
+#x(((a𢀔𢀗+𢀔𢀗+v(da𢀔𢀗+ewa.adsdadasdferqw2ed)*(ssadsadè+𢀔𢀗+è+è+èè+èp𢀔𢀗+𢀔𢀗+𢀔𢀗+𢀔𢀗+èpèpèpès)+)+p[𢀔-𢀗]+)*(𢀔𢀗+)+)y(((av(dd)(ss))p[𢀔-𢀗]+)*(𢀔𢀔èéèé?ò.òòçççòòòçç𢀗+𢀗+)+)

@@ -46,17 +46,18 @@
 #define OP_ISN               0x60
 #define OP_FOR_STAR          0x80
 #define OP_FOR_PLUS          0x81
-#define OP_STO               0x90
-#define OP_RCL               0x91
-#define OP_RST               0x92
+#define OP_STO               0x82
+#define OP_RCL               0x83
+#define OP_RST               0x84
+#define OP_ONF               0x90
 #define OP_JPM               0xA0
 #define OP_JPF               0xB0
 #define OP_NXT               0xC0
 #define OP_FOR               0xD0
 
 #define OP_CHR_BASE          0xE0
-#define OP_RNG_BASE          0xE8
 #define OP_CHR_U_BASE        0xF0
+#define OP_RNG_BASE          0xE8
 #define OP_CHH3              0xE2
 #define OP_CHH4              0xF2
 
@@ -80,7 +81,6 @@
 #define OP_HDR_START         0xFF
 #define OP_HDR_NCAPT         0xEF
 
-                     // 0 1 2 3 4 5 6 7 8 9 A B C D E F 
-uint8_t skpoplen_[16] = {1,1,1,1,1,1,1,1,1,1,2,2,2,3,2,3};
+extern uint8_t skpoplen_[16];
 
 #define skpoplen(x) (skpoplen_[((x)>>4) & 0x0F])

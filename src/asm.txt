@@ -60,17 +60,18 @@
 
 80  1000 0000 FOR 0,*      min = (op & 0x01) ; max = MAX; CNT = 0
 81  1000 0001 FOR 1,*
+82  1000 0010 STO          Set TMP <- CUR
+83  1000 0011 RCL          Set CUR <- TMP
+84  1000 0100 RST          Set CUR to start and M to 1
+FE  1111 1110 FOR          next two bytes are for min/max (max == 0 means MAX) 1xxx xxxx (7 bit)
 
-90  1001 0000 STO          Set TMP <- CUR
-91  1001 0001 RCL          Set CUR <- TMP
-92  1001 0010 RST          Set CUR to start and M to 1
-
+90  1001 xxxx ONF          
 A0  1010 xxxx JPM
 B0  1011 xxxx JPF          xxxx xxxx (12 bit)
 C0  1100 xxxx NXT          if MATCH and (++CNT < MAX) JMP Lxxx
                            if FAIL and (CNT >= MIN) M=1
 
-D0  1101 0000 FOR          next two bytes are for min/max (max == 0 means MAX) 1xxx xxxx (7 bit)
+D0  1101 xxxx ONM
 
 E0  1110 0000 CHR FOLD
 E1  1110 0001 CHN FOLD
@@ -123,5 +124,7 @@ CLO 1 *      Set Min=1, Max=*, Cnt=0
 CHR [NOCASE] [NOT]
 RNG [NOCASE] [NOT]
 
+------------------------------------
 
-1101 0000 0000 0000 len
+
+
