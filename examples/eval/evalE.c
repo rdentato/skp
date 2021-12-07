@@ -5,9 +5,10 @@
 
 
 /*
-expr = '-' term | term (('+'|'-') term)* ;
+eval = expr
+expr = term (('+'|'-') term)* ;
 term = fact (('*'|'/') fact)* ;
-fact = num | id | '(' expr ')'
+fact = num | id | - fact | '(' expr ')'
 */
 
 skpdef(eval) {
@@ -69,7 +70,7 @@ int main(int argc, char *argv[])
   if (argc<2) {fprintf(stderr,"string?\n"); return 1;}
 
   ast = skpparse(argv[1],eval);
-  dbgtrc("Nodes: %d",astnumnodes(ast));
+  trace("Nodes: %d",astnumnodes(ast));
 
   astprint(ast,out);
   printf("\n");

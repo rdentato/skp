@@ -5,9 +5,10 @@
 
 
 /*
-expr = '-' term | term (('+'|'-') term)* ;
+eval = expr
+expr = term (('+'|'-') term)* ;
 term = fact (('*'|'/') fact)* ;
-fact = num | id | '(' expr ')'
+fact = num | id | - fact | '(' expr ')'
 */
 
 skpdef(eval) {
@@ -22,11 +23,6 @@ skpdef(expr) {
     skprule(term); astlift;
     astswap;
   }
-}
-
-skpdef(neg) {
-    skpstring_("-");
-    skprule_(fact);
 }
 
 skpdef(term) {
@@ -50,6 +46,11 @@ skpdef(fact) {
     }
 }
 
+skpdef(neg) {
+    skpstring_("-");
+    skprule_(fact);
+}
+
 skpdef(op_add) {
   skpmatch_("&*s");
   skpmatch("+\1-");
@@ -69,7 +70,7 @@ int main(int argc, char *argv[])
   if (argc<2) {fprintf(stderr,"string?\n"); return 1;}
 
   ast = skpparse(argv[1],eval);
-  dbgtrc("Nodes: %d",astnumnodes(ast));
+  trace("Nodes: %d",astnumnodes(ast));
 
   astprint(ast,out);
   printf("\n");
@@ -80,12 +81,12 @@ int main(int argc, char *argv[])
   }
   else {
     astvisitdf(ast,node) {
-      if (astisnodeentry(ast,node)) {
+      if (astisnodeentry(ast,node)) {  // Entering the node (preorder)
         if (astnodeis(ast,node,STR)) {
           fprintf(out,"%.*s ",astnodelen(ast,node), astnodefrom(ast,node));
         }
       }
-      else {
+      else { // Exiting the node (postorder)
         if (astnodeis(ast,node,neg)) fprintf(out,"-1 * ");
       }
     }
