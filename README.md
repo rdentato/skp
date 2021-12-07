@@ -232,6 +232,27 @@ The basic idea of directly represent in code a grammar is in:
    Fundamenta Informaticae 79, 3-4 (2007), pp. 513 - 524. 
    http://www.romanredz.se/papers/FI2007.pdf
 ```
+
+### Grammar spefier
+
+```
+  skpmatch(char *pattern)             create a node `$n` with 1<=n<=7
+  skpstring(char *string [, int n])   create a node `$n` with 1<=n<=7 
+  skprule(rule)                       create a note `rule`
+```
+
+
+```
+  skponce    parse
+  skpor      try alternative parse
+  skpmaybe   one or zero times
+  skpany     zero or many imes
+  skpmany    one or many times
+  skpnot     negative lookahead
+  skppeek    positive lookahead
+```
+
+
 ### AST in-grammar modifiers
 Sometime you don't want certain nodes in the final AST.
 Tipically, spaces and separators are useless for the next steps of
@@ -245,10 +266,11 @@ You can prevent a node to be generated using a variant of the skp... functions
   skprule_(rule);
 ```
 
-There also two ast modifiers:
+There also three ast modifiers:
 ```
-  astswap;   swap last two nodes in a branch
-  astlift;   eliminate the parent node if it has a single child.
+  astswap;     swap last two nodes in a branch
+  astlift;     eliminate the parent node if it has a single child.
+  astinfo(n);  add an INFO node with the specified value.
 ```
 
 ### AST traversing

@@ -1,0 +1,4 @@
+   REM Test for a TinyBasic Compiler (to C)
+10 PRINT "HELLO WORLD!" K
+   LET K = K+1
+   GOTO 10

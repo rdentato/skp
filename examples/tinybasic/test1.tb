@@ -1,0 +1,9 @@
+10 PRINT "STARTING"
+   PRINT "INSERT X Y" ;
+   INPUT X Y
+   LET X = - (Y+19) * 4
+   PRINT "RESULT: " X
+   GOTO 10
+   FOR k = 1 TO 10
+     PRINT k
+   NEXT
