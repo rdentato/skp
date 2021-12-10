@@ -203,7 +203,7 @@ skpdef(term) {
 char *loadsource(char *fname)
 {
   FILE *f;
-  int32_t size;
+  int32_t size=0;
   char *src=NULL;
 
   f = fopen(fname,"rb");
@@ -211,15 +211,20 @@ char *loadsource(char *fname)
     fseek(f,0,SEEK_END);
     size = ftell(f);
     fseek(f,0,SEEK_SET);
-    src = malloc(size+1);
+    src = malloc(size+1+!(size & 1));
     if (src) {
-      if (!fread(src,size,1,f)) {
+      *src = '\0';
+      if (fread(src,size,1,f)) {
+        src[size] = '\0';
+      }
+      else {
         free(src);
         src = NULL;
       };
     }
+    fclose(f);
   }
-  if (f) fclose(f);
+  
   return src;
 }
 

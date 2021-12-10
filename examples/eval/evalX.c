@@ -25,39 +25,45 @@ by one:
 */
 
 skpdef(eval) {
-  skprule(expr);
-    skp_trace("EXPR: %d",ast_->fail);
-  skpmatch("&!.\7"); // Ensure all input is consumed
+  skpmany {
+    skprule(expr);
+    astnoleaf;
+  }
+  skpmatch_("&!.\7"); 
 }
 
 skpdef(expr) {
   skponce {
-    skprule(fact);
-    skp_trace("FACT2: %d",ast_->fail);
-    skpmatch("+\1-"); // + or -
-    skprule(expr);
+    skprule(AA);
+    astlift;
+    astnoleaf;
   }
   skpor {
-    skprule(fact);
-    skp_trace("FACT: %d",ast_->fail);
+    skprule(BB);
+  }
+  skpor {
+    skprule(CC);
   }
 }
 
-skpdef(fact) {
-  skponce {
-    skpmatch("&D");
-  }
-  skpor {
-    skpstring("(");
-    skprule(expr);
-    skpstring(")");
-  }
+skpdef(AA) {
+  skpstring("AA");
+  astlift;
+}
+skpdef(BB) {
+  skpstring("B");
+  skpstring("B");
 }
 
-/*
+skpdef(CC) {
+  skpstring("C");
+  skpstring("C");
+}
 
-
-*/
+skpdef(DD) {
+  skpstring_("D");
+  skpstring_("D");
+}
 
 #define trace(...) (fprintf(stderr,__VA_ARGS__),fputc('\n',stderr))
 int main(int argc, char *argv[])
@@ -67,7 +73,7 @@ int main(int argc, char *argv[])
 
   if (argc<2) {fprintf(stderr,"Usage: %s expr\n",argv[0]); return 1;}
 
-  ast = skpparse(argv[1],eval);
+  ast = skpparse(argv[1],DD);
 
   astprint(ast,out);
   printf("\n");
@@ -77,14 +83,19 @@ int main(int argc, char *argv[])
     trace("In rule: '%s'",asterrorrule(ast));
   }
   else {
-    astvisitdf(ast,node) {
-      if (astisnodeentry(ast,node)) {
-        if (astnodeis(ast,node,STR1)) {
-          fprintf(out,"%.*s ",astnodelen(ast,node), astnodefrom(ast,node));
-        }
-      }
+    for (int k=0; k< ast->par_cnt; k++) {
+      fprintf(out,"%4d",k);
     }
     fputc('\n',out);
+    for (int k=0; k< ast->par_cnt; k++) {
+      fprintf(out,"%4d",ast->par[k]);
+    }
+    fputc('\n',out);
+    for (int k=0; k< ast->par_cnt; k++) {
+      if (ast->par[k] >= 0) {
+        fprintf(out,"%4d: %s '%.*s'\n",ast->par[k],astnoderule(ast,k),astnodelen(ast,k),astnodefrom(ast,k));
+      }
+    }
   }
   astfree(ast);
 }

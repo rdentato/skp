@@ -266,11 +266,12 @@ You can prevent a node to be generated using a variant of the skp... functions
   skprule_(rule);
 ```
 
-There also three ast modifiers:
+There also the following ast modifiers:
 ```
   astswap;     swap last two nodes in a branch
-  astlift;     eliminate the parent node if it has a single child.
+  astlift;     replace a node with its only child (if it has a single child).
   astinfo(n);  add an INFO node with the specified value.
+  astnoleaf;   remove previous node if it's a leaf.
 ```
 
 ### AST traversing

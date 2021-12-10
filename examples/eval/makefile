@@ -1,10 +1,16 @@
 
 TOP = ../..
-TEST = t_$(notdir $(realpath .))
 
 TOP=../..
 
-CFLAGS =  -O2 -I$(TOP)/src
+OPT=-O2
+#OPT=-ggdb3 -O0
+
+CFLAGS =  $(OPT) -Wall -I$(TOP)/src
+
+.PRECIOUS: %.o
+all:
+	@ls eval?.c
 
 eval%: eval%.o
 	$(CC) $(LNFLAGS) -o $@ eval$*.o 
