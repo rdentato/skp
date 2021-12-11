@@ -5,7 +5,8 @@
 // A toy language to show skp features
 
 /* GRAMMAR 
-expr = term (('+'|'-') term )*
+expr = rel  (('<>'|'<='|'<'|'>'|'>=') rel )*
+rel  = term (('+'|'-') term )*
 term = fact (('*'|'/') fact )*
 fact = '&D' | '-' fact | var | '(' expr ')'
 var  = '&I'
