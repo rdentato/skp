@@ -25,11 +25,11 @@
 #define skp_v_argn(...)  skp_v_cnt(__VA_ARGS__, 6, 5, 4, 3, 2, 1, 0)
 #define skp_v_cat0(x,y)  x ## y
 #define skp_v_cat(x,y)   skp_v_cat0(x,y)
-#define skp_v(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
+#define skp_varg(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
 
 int skp_(char *src, char *pat, char **end, char **to);
 
-#define skp(...)    skp_v(skp_,__VA_ARGS__)
+#define skp(...)    skp_varg(skp_,__VA_ARGS__)
 #define skp_2(s,p)      skp_(s,p,NULL,NULL)
 #define skp_3(s,p,e)    skp_(s,p, e,NULL);
 #define skp_4(s,p,e,t)  skp_(s,p, e,t);
@@ -66,8 +66,8 @@ extern volatile int skp_zero;
 // MAIN *******************************************************
 // ************************************************************ 
 // Borrowed from dbg.h but renamed to minimize namespace pollution.
-#define _skp_trace(...)
-#define  skp_trace(...) (fprintf(stderr,"TRCE: " __VA_ARGS__), \
+#define _skptrace(...)
+#define  skptrace(...) (fprintf(stderr,"TRCE: " __VA_ARGS__), \
                          fprintf(stderr," \xF%s:%d\n",__FILE__,__LINE__))
 
 #ifdef SKP_MAIN
@@ -138,7 +138,7 @@ static uint32_t skp_next(char *s,char **end,int iso)
 }
 
 static int chr_cmp(uint32_t a, uint32_t b, int fold)
-{
+{ _skptrace("CMP: %d %c %c",fold, a,b);
   if (fold && a <= 0xFF && b <= 0xFF) {
     a = tolower(a);
     b = tolower(b);
@@ -208,7 +208,7 @@ static int is_oneof(uint32_t ch, char *set, int iso)
   uint32_t p_ch,q_ch;
   char *s;
   if (ch == '\0') return 0;
- _skp_trace("set: [%s] chr: %c",set,ch);
+ _skptrace("set: [%s] chr: %c",set,ch);
   p_ch = skp_next(set,&s,iso);
   
   if (p_ch == ']' && ch == ']') return 1;
@@ -253,7 +253,7 @@ static uint32_t get_qclose(uint32_t open)
 #define MATCHED_GOAL    2
 #define MATCHED_GOALNOT 3
 
-static int match(char *pat, char *src, char **pat_end, char **src_end)
+static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
 {
   uint32_t p_chr, s_chr;
   char *p_end, *s_end;
@@ -262,13 +262,11 @@ static int match(char *pat, char *src, char **pat_end, char **src_end)
   uint32_t match_max = 1;
   uint32_t match_cnt = 0;
   uint32_t match_not = 0;
-  int fold = false;
-  int iso = false;
   int intnumber  = false;
   char *s_tmp = src;
   
   s_end = src;
-  s_chr = skp_next(s_end, &s_tmp,iso);
+  s_chr = skp_next(s_end, &s_tmp,*flg & 2);
 
   if (*pat == '&') {
     pat++;
@@ -278,18 +276,18 @@ static int match(char *pat, char *src, char **pat_end, char **src_end)
     else if (*pat == '?') { match_min = 0; pat++; }
     
     if (*pat == '!') { match_not = 1; pat++; }
-   _skp_trace("min: %u max: %u not: %u",match_min, match_max, match_not);
+   _skptrace("min: %u max: %u not: %u",match_min, match_max, match_not);
 
     #define W(x)  \
       do { \
-       _skp_trace("matchedW: '%s' schr: %X test: %d (%s)",s_end,s_chr,(x),#x); \
+       _skptrace("matchedW: '%s' schr: %X test: %d (%s)",s_end,s_chr,(x),#x); \
         for (match_cnt = 0; \
              (match_cnt < match_max) && (s_chr && (!!(x) != match_not)); \
              match_cnt++) { \
-          s_end = s_tmp; s_chr = skp_next(s_end,&s_tmp,iso); \
+          s_end = s_tmp; s_chr = skp_next(s_end,&s_tmp,*flg & 2); \
         } \
         ret = (match_cnt >= match_min); \
-       _skp_trace("cnt: %d ret: %d s: %c end: %c",match_cnt,ret,*s_tmp, *s_end); \
+       _skptrace("cnt: %d ret: %d s: %c end: %c",match_cnt,ret,*s_tmp, *s_end); \
       } while (0)
 
     #define get_next_s_chr() do {s_end = s_tmp; s_chr = *s_end ; s_tmp++;} while(0)
@@ -316,16 +314,17 @@ static int match(char *pat, char *src, char **pat_end, char **src_end)
       case '@' : ret = match_not? MATCHED_GOALNOT : MATCHED_GOAL;
                  break;
 
-      case '[' : W(is_oneof(s_chr,pat,iso));
+      case '[' : W(is_oneof(s_chr,pat,*flg & 2));
                  while (*pat && *pat != ']') pat++;
                  if (*pat && pat[1]==']') pat++;
                  pat++;
                  break;
 
-      case 'C' : fold = !match_not; ret = MATCHED;
+      case 'C' : *flg = (*flg & ~1) | match_not; ret = MATCHED;
+                _skptrace("FOLD: %d",*flg & 1);
                  break;
 
-      case 'U' : iso = match_not; ret = MATCHED;
+      case 'U' : *flg = (*flg & ~2) | (match_not * 2); ret = MATCHED;
                  break;
 
       case 'N' : // Up to end of line
@@ -447,9 +446,9 @@ static int match(char *pat, char *src, char **pat_end, char **src_end)
     p_end = pat;
   }
   else {
-    p_chr = skp_next(pat,&p_end,iso);
+    p_chr = skp_next(pat,&p_end,*flg & 2);
     s_end = s_tmp;
-    ret = chr_cmp(s_chr,p_chr,fold); 
+    ret = chr_cmp(s_chr,p_chr,*flg & 1); 
   }
 
   if (ret != MATCHED_FAIL) {
@@ -469,48 +468,49 @@ int skp_(char *src, char *pat, char **to,char **end)
   int   ret = 0;
   char *goal = NULL;
   char *goalnot = NULL;
+  int   flg = 0;
 
   if (!pat || !src) { return 0; }
 
- _skp_trace("SKP_: src:'%s' pat:'%s'",src,pat);
+ _skptrace("SKP_: src:'%s' pat:'%s'",src,pat);
 
   if ((pat[0] == '&') && (pat[1] == '>')) {
     skp_to = 1;
     pat   += 2;
   }
- _skp_trace("SKP_: src:'%s' pat:'%s' skp_to:%d",src,pat,skp_to);
+ _skptrace("SKP_: src:'%s' pat:'%s' skp_to:%d",src,pat,skp_to);
 
   p = pat;
   s = start;
   while (*p > '\7') {
-    if ((matched = match(p,s,&p_end,&s_end))) {
-     _skp_trace("matched( '%s' '%s'",s,p);
+    if ((matched = match(p,s,&p_end,&s_end,&flg))) {
+     _skptrace("matched( '%s' '%s'",s,p);
       s = s_end; p = p_end;
-     _skp_trace("matched) '%s' '%s'",s,p);
+     _skptrace("matched) '%s' '%s'",s,p);
       if (matched == MATCHED_GOAL && !goalnot) goal = s;
       else if (matched == MATCHED_GOALNOT) goalnot = s;
     }
     else {
-     _skp_trace("notmatched  '%s' '%s'",s,p);
+     _skptrace("notmatched  '%s' '%s'",s,p);
       while (*p > '\7') p++;
-     _skp_trace("notmatched+ '%s' '%s'",s,p);
+     _skptrace("notmatched+ '%s' '%s'",s,p);
       if ((*p > '\0') && (p[1] > '\0')) { // Try a new pattern
         s = start;
         p++;
-       _skp_trace("resume from: %s (%c)", p,*s);
+       _skptrace("resume from: %s (%c)", p,*s);
       }
       else if (skp_to) {
         goal = NULL;  goalnot = NULL;
         p = pat;
         s = ++start;
-       _skp_trace("retry '%s'",s);
+       _skptrace("retry '%s'",s);
         if (*s == '\0') break;
       }
       else break;
     }
   }
 
- _skp_trace("pat: '%s'",p);
+ _skptrace("pat: '%s'",p);
 
   if (!matched && goalnot) {
     goal = goalnot;
@@ -589,6 +589,7 @@ typedef struct ast_s {
   int32_t     err_pos;
   int32_t     mmz_cnt;
   int32_t     mmz_max;
+  int32_t     last_info;
   int16_t     fail;
 } *ast_t;
 
@@ -640,10 +641,43 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename);
 #define skp_how_string(str,alt) \
     int32_t len = strlen(str); int n = strncmp(from,str,len)?0:(alt)
 
-#define skpstring(...)     skp_v(skp_string,__VA_ARGS__)
-#define skp_string1(str)       skp_string2(str,1)
-#define skp_string2(str,alt)   skp_match(skp_how_string(str,alt))
-#define skpstring_(str)        skp_match_(skp_how_string(str,1))
+#define skpstring(...)     skp_varg(skp_string,__VA_ARGS__)
+#define skp_string1(str)            skp_string2(str,1)
+#define skp_string2(str,alt)        skp_match(skp_how_string(str,alt))
+#define skpstring_(str)             skp_match_(skp_how_string(str,1))
+
+#define skpanyspaces()  skpmatch_("&*s");
+#define skpmanyspaces() skpmatch_("&+s");
+#define skpanyblanks()  skpmatch_("&*w");
+#define skpmanyblanks() skpmatch_("&+w");
+
+#define skplookup(...)      skp_varg(skp_lookup,__VA_ARGS__)
+#define skp_lookup1(f)      skp_lookup2(f,1)
+#define skp_lookup2(f,n) \
+    if (!ast_->fail) { \
+      char *ptr = ast_->start+ast_->pos;\
+      int32_t par; \
+      int32_t info = f(&ptr); \
+      if (ptr == NULL) {ast_->fail = 1;} \
+      else { \
+        if (info != 0) ast_setinfo(ast_,info); \
+        if (info >= 0) par = ast_open(ast_,ast_->pos,skp_N_STR1+(n-1)*4);\
+        ast_->pos = (int32_t)(ptr-ast_->start); \
+        if (info >= 0) par = ast_close(ast_,ast_->pos,par); \
+      } \
+    } if (!ast_->fail) switch(ast_->last_info)
+
+#define skplookup_(f) \
+    if (!ast_->fail) { \
+      char *ptr = ast_->start+ast_->pos;\
+      int32_t info = f(&ptr); \
+      if (ptr == NULL) {ast_->fail = 1;} \
+      else { \
+        ast_->last_info = info; \
+        ast_->pos = (int32_t)(ptr-ast_->start); \
+      } \
+    } if (!ast_->fail) switch(ast_->last_info)
+
 
 typedef struct {
   int32_t pos;
@@ -693,6 +727,7 @@ typedef struct {
         skp_memoize(ast_, skp_M_ ## rule ,skp_N_ ## rule,sav_pos,sav_par_cnt); \
       } \
     } else (void)0
+
 
 //
 // sav.flg controls the flow. It is initialized to 3
@@ -765,6 +800,8 @@ void ast_lift(ast_t ast);
 #define astnoleaf ast_noleaf(ast_)
 void ast_noleaf(ast_t ast);
 
+#define astlastinfo (ast_->last_info)
+
 #define astnodeis(a,n,r) ast_is(a,n,skp_N_ ## r)
 int ast_is(ast_t ast, int32_t node, char*rulename);
 int astisleaf(ast_t ast, int32_t node);
@@ -808,7 +845,7 @@ void skp_memoize(ast_t ast, ast_mmz_t *mmz, char *rule, int32_t old_pos, int32_t
   }
   numnodes = (end_par - start_par)/2;
 
- _skp_trace("MMZ: [%d] %s @%d par:[%d,%d]",ast->fail,rule,old_pos, start_par,end_par);
+ _skptrace("MMZ: [%d] %s @%d par:[%d,%d]",ast->fail,rule,old_pos, start_par,end_par);
   // Find the proper slot
   //    Any empty slot?
   for (slot = 0; (slot<4) && mmz[slot] ; slot++) {
@@ -827,7 +864,7 @@ void skp_memoize(ast_t ast, ast_mmz_t *mmz, char *rule, int32_t old_pos, int32_t
       mmz[slot] = NULL;
     }
   }
- _skp_trace("MMZ: storing %d",slot);
+ _skptrace("MMZ: storing %d",slot);
   if (mmz[slot] == NULL) {
     mmz[slot] = malloc(sizeof(struct ast_mmz_s) + numnodes * sizeof(ast_node_t));
     assert(mmz[slot]);
@@ -835,7 +872,7 @@ void skp_memoize(ast_t ast, ast_mmz_t *mmz, char *rule, int32_t old_pos, int32_t
   }
 
   // Record position
- _skp_trace("MMZ: storing %d pos: %d",slot,old_pos);
+ _skptrace("MMZ: storing %d pos: %d",slot,old_pos);
   mmz[slot]->pos = old_pos;
   mmz[slot]->endpos = ast->pos;
   // Record fail
@@ -847,7 +884,7 @@ void skp_memoize(ast_t ast, ast_mmz_t *mmz, char *rule, int32_t old_pos, int32_t
   for (int32_t k=start_par; k<end_par; k++) {
     if (ast->par[k] >=0) {
       //nd = & ast->nodes[ast->par[k]];
-      //skp_trace("MMZ:   [%d] from: %d to: %d delta: %d rule: '%s':",k,nd->from,nd->to,nd->delta,nd->rule);
+      //skptrace("MMZ:   [%d] from: %d to: %d delta: %d rule: '%s':",k,nd->from,nd->to,nd->delta,nd->rule);
       mmz[slot]->nodes[cur_node++] = ast->nodes[ast->par[k]];
     }
   }
@@ -873,11 +910,11 @@ void skp_mmz_add(ast_t ast, ast_mmz_t *mmz)
 void skp_mmz_clean(ast_t ast)
 {
   ast_mmz_t *mmz;
- _skp_trace("MMZ clean: %p (%d)",(void *)ast->mmz,ast->mmz_cnt);
+ _skptrace("MMZ clean: %p (%d)",(void *)ast->mmz,ast->mmz_cnt);
   while (ast->mmz_cnt) {
     mmz = ast->mmz[--ast->mmz_cnt];
     for (int k=0; k<4; k++) {
-     _skp_trace("MMZ clean: %p %p",(void *)mmz,(void *)mmz[k]);
+     _skptrace("MMZ clean: %p %p",(void *)mmz,(void *)mmz[k]);
       if (mmz[k]) free(mmz[k]); 
       mmz[k] = SKP_MMZ_NULL;
     }
@@ -888,22 +925,22 @@ void skp_mmz_clean(ast_t ast)
 #define SKP_DELTA_MAX INT32_MAX
 int skp_dememoize(ast_t ast, ast_mmz_t *mmz, char *rule)
 {
- _skp_trace("MM?: '%s' %d",rule,ast->pos);
+ _skptrace("MM?: '%s' %d",rule,ast->pos);
   if (mmz[0] == SKP_MMZ_NULL) {
     skp_mmz_add(ast, mmz);
     for (int k=0; k<4; k++) mmz[k] = NULL;
-   _skp_trace("MM?: first mmz");
+   _skptrace("MM?: first mmz");
     return 0;
   }
   // Search for pos
   int slot = 0;
   while(1) {
-   _skp_trace("MM?:   search %d",slot);
+   _skptrace("MM?:   search %d",slot);
     if (mmz[slot] && (mmz[slot]->pos == ast->pos)) break;
     if (++slot >= 4) return 0;
   }
   int32_t numnodes = mmz[slot]->numnodes;
- _skp_trace("MM?: found at %d (nodes: %d)",slot,numnodes);
+ _skptrace("MM?: found at %d (nodes: %d)",slot,numnodes);
   int32_t cur_par, delta;
   ast->fail = (numnodes < 0); // restore fail flag
   ast->pos = mmz[slot]->endpos;
@@ -945,7 +982,7 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename)
   ast->err_pos = -1;
   ast->err_rule = NULL;
 
- _skp_trace("Parsing %s",rulename);
+ _skptrace("Parsing %s",rulename);
   if ((open = ast_open(ast, ast->pos, rulename)) >= 0) {
     rule(ast);
     if (ast->fail && ast->err_pos < ast->pos) {
@@ -983,38 +1020,38 @@ void ast_swap(ast_t ast)
 
   int32_t o1, c1, o2, c2;
 
- _skp_trace("SWAP fail? %d",ast->fail);
+ _skptrace("SWAP fail? %d",ast->fail);
   if (ast->fail || ast->par_cnt < 4) return;
 
   c1 = ast->par_cnt-1;
- _skp_trace("SWAP c1: %d (%d)",c1,ast->par[c1]);
+ _skptrace("SWAP c1: %d (%d)",c1,ast->par[c1]);
   if (c1<0 || ast->par[c1] >= 0) return;
 
   o1 = c1+ast->par[c1];
- _skp_trace("SWAP o1: %d (%d)",o1,ast->par[o1]);
+ _skptrace("SWAP o1: %d (%d)",o1,ast->par[o1]);
   if (o1<0 || ast->par[o1] < 0) return;
 
   c2 = o1-1;
- _skp_trace("SWAP c2: %d (%d)",c2,ast->par[c2]);
+ _skptrace("SWAP c2: %d (%d)",c2,ast->par[c2]);
   if (c2<0 || ast->par[c2] >= 0) return;
 
   o2 = c2+ast->par[c2];
- _skp_trace("SWAP o2: %d (%d)",o2,ast->par[o2]);
+ _skptrace("SWAP o2: %d (%d)",o2,ast->par[o2]);
   if (o2<0 || ast->par[o2] < 0) return;
   
   void *tmp = malloc((c2-o2+1) * sizeof(int32_t));
   if (tmp) {
-   _skp_trace("SWAP: tmp<- (%d,%d) [%d]",o2,c2,c2-o2+1);
+   _skptrace("SWAP: tmp<- (%d,%d) [%d]",o2,c2,c2-o2+1);
     memcpy(tmp,ast->par+o2,(c2-o2+1)*sizeof(int32_t));
 
-   _skp_trace("SWAP: (%d)<-(%d,%d) [%d]",o2,o1,c1,c1-o1+1);
+   _skptrace("SWAP: (%d)<-(%d,%d) [%d]",o2,o1,c1,c1-o1+1);
     memmove(ast->par+o2, ast->par+o1,(c1-o1+1)*sizeof(int32_t));
     
-   _skp_trace("SWAP: (%d)<-tmp [%d]",o2+(c1-o1+1),c2-o2+1);
+   _skptrace("SWAP: (%d)<-tmp [%d]",o2+(c1-o1+1),c2-o2+1);
     memcpy(ast->par+o2+(c1-o1+1),tmp,(c2-o2+1)*sizeof(int32_t));
 
     free(tmp);
-   _skp_trace("SWP: done");
+   _skptrace("SWP: done");
   }
 }
 
@@ -1079,7 +1116,7 @@ int ast_is(ast_t ast, int32_t node, char*rulename)
   if (ast->par[node]<0) node += ast->par[node];
 
   nd = &ast->nodes[ast->par[node]];
- _skp_trace("IS: '%s' '%s'",nd->rule,rulename);
+ _skptrace("IS: '%s' '%s'",nd->rule,rulename);
   if (rulename == skp_N_STR) {
     if (skp_N_STR1 <= nd->rule && nd->rule <= skp_N_STR7) {
       int ret = ((int)(nd->rule - skp_N_STR1) & 0X07);
@@ -1215,7 +1252,7 @@ static int skp_par_makeroom(ast_t ast,int32_t needed)
       new_max += new_max &1;
     } while (ast->par_cnt+needed > new_max);
 
-   _skp_trace("NEW_PAR_MAX: %d * %d",new_max,(int)sizeof(int32_t));
+   _skptrace("NEW_PAR_MAX: %d * %d",new_max,(int)sizeof(int32_t));
     new_par = realloc(ast->par,new_max * sizeof(int32_t));
     assert(new_par);
     if (!new_par) {errno = ENOMEM; return 0; }
@@ -1241,7 +1278,7 @@ static int skp_nodes_makeroom(ast_t ast,int32_t needed)
       new_max += new_max/2;
       new_max += new_max & 1;
     } while (ast->nodes_cnt + needed > new_max);
-   _skp_trace("NEW_NODE_MAX: %d * %d",new_max,(int)sizeof(struct ast_node_s));
+   _skptrace("NEW_NODE_MAX: %d * %d",new_max,(int)sizeof(struct ast_node_s));
     new_nodes = realloc(ast->nodes,new_max * sizeof(struct ast_node_s));
     assert(new_nodes);
     if (!new_nodes) {errno = ENOMEM; return 0;}
@@ -1296,8 +1333,11 @@ int32_t ast_close(ast_t ast, int32_t to, int32_t open)
 void ast_setinfo(ast_t ast, int32_t info)
 {
   int32_t par;
-  par = ast_open(ast,info,skp_N_INFO);
-  ast_close(ast,info,par);
+  if (!ast->fail) {
+    par = ast_open(ast,info,skp_N_INFO);
+    ast_close(ast,info,par);
+    ast->last_info = info;
+  }
 }
 
 int32_t astnodeinfo(ast_t ast, int32_t node)
