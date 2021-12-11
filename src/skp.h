@@ -653,11 +653,23 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename);
 
 #define skplookup(...)      skp_varg(skp_lookup,__VA_ARGS__)
 #define skp_lookup1(f)      skp_lookup2(f,1)
-#define skp_lookup2(f,n) \
+#define skp_lookup2(f,n)    skp_fcall(f,n) \
+                            if (!ast_->fail) switch(ast_->last_info)
+
+#define skplookup_(f)  skp_fcall_(f) \
+                       if (!ast_->fail) switch(ast_->last_info)
+
+#define skpcheck(...)      skp_varg(skp_check,__VA_ARGS__)
+#define skp_check1(f)      skp_check2(f,1)
+#define skp_check2(f,n)    skp_fcall(f,n) (void)0
+
+#define skpcheck_(f)       skp_fcall_(f) (void)0
+
+#define skp_fcall(f,n) \
     if (!ast_->fail) { \
       char *ptr = ast_->start+ast_->pos;\
-      int32_t par; \
       int32_t info = f(&ptr); \
+      int32_t par; \
       if (ptr == NULL) {ast_->fail = 1;} \
       else { \
         if (info != 0) ast_setinfo(ast_,info); \
@@ -665,9 +677,9 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename);
         ast_->pos = (int32_t)(ptr-ast_->start); \
         if (info >= 0) par = ast_close(ast_,ast_->pos,par); \
       } \
-    } if (!ast_->fail) switch(ast_->last_info)
+    } 
 
-#define skplookup_(f) \
+#define skp_fcall_(f) \
     if (!ast_->fail) { \
       char *ptr = ast_->start+ast_->pos;\
       int32_t info = f(&ptr); \
@@ -676,8 +688,7 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename);
         ast_->last_info = info; \
         ast_->pos = (int32_t)(ptr-ast_->start); \
       } \
-    } if (!ast_->fail) switch(ast_->last_info)
-
+    } 
 
 typedef struct {
   int32_t pos;
