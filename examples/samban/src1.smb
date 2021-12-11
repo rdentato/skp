@@ -1,0 +1,17 @@
+X = 3 ;
+
+if X > 3 then 
+  print X ;
+
+if Y then { 
+  print Y;
+  print b;
+}
+
+if X < Y Then
+  print X ;
+else {
+  print X ;
+  X = Y;
+}
+
