@@ -11,7 +11,7 @@ the uppercase/lower case conversion is only for the ASCII portion of the Latin a
 
 Some of the Unicode spaces are recognized like U+00A0 (NO-BREAK SPACE), U+2001 (EM QUAD), etc.
 
-Default encoding is UTF-8, alternatively the IS-8859-15 encoding can be used.
+Default encoding is UTF-8, alternatively the ISO-8859-1 encoding can be used.
 
 Skp can be used at three increasing levels of complexity:
   - Skipping, where the focus is to identify portion of text that can be skipped according a pattern;
