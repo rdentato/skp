@@ -7,7 +7,7 @@
 /* GRAMMAR 
 expr = rel  (('<>'|'<='|'<'|'>'|'>=') rel )*
 rel  = term (('+'|'-') term )*
-term = fact (('*'|'/') fact )*
+term = fact (('*'|'/'|'%') fact )*
 fact = '&D' | '-' fact | var | '(' expr ')'
 var  = '&I'
 
@@ -17,6 +17,7 @@ bloc = '{' statement+ '}' | statement ';'
 statement = 'if' expr 'then' bloc ('else' bloc)?
           | 'while' expr 'do' bloc 
           | 'print' expr ';'
+          | 'input' var (',' var)* ';'
           | var '=' expr ';'
 
 */
@@ -26,12 +27,12 @@ statement = 'if' expr 'then' bloc ('else' bloc)?
 /* expressions */
 
 skpdef(expr) {
-  skprule(rel);
+  skprule_(rel);
   astlift;
   skpany {
     skpanyspaces();
     skpmatch("==\1<>\1<=\1<\1>=\1>");
-    skprule(rel);
+    skprule_(rel);
     astlift;
     astswap;  // Convert in RPN
   }
@@ -54,7 +55,7 @@ skpdef(term) {
   skprule_(fact);
   skpany {
     skpanyspaces();
-    skpmatch("*\1/");
+    skpmatch("*\1/\1%");
     skprule_(fact);
     astswap;  // Convert in RPN
   }
@@ -76,9 +77,11 @@ skpdef(neg) {
   skprule_(fact);
 }
 
+#define TOK_LET   -200
 #define TOK_IF    -201
 #define TOK_PRINT -202
 #define TOK_WHILE -203
+#define TOK_INPUT -204
 
 // Check keywords
 int32_t keywords(char **src)
@@ -86,7 +89,7 @@ int32_t keywords(char **src)
   int alt;
   char *to;
   // Imagine a huge lookup table! (or a perfect hash table) ...
-  alt = skp(*src, "&!Cif\1&!Cprint\2&!Cwhile\3",&to);
+  alt = skp(*src, "&!Cif\1&!Cprint\2&!Cwhile\3&!Cinput\4",&to);
   
   if (alt == 0) {
     *src = NULL;  // Failed to match!
@@ -106,9 +109,11 @@ skpdef(statement) {
                     astlift;
                     skpmatch_("&*s&!CTHEN&*s");
                     skprule(bloc);
+                    astlift;
                     skpmaybe {
                       skpmatch_("&*s&!CELSE&*s");
                       skprule(bloc);
+                      astlift;
                     }
                     break;
 
@@ -117,13 +122,23 @@ skpdef(statement) {
                     skpmatch_("&*s;&*s");
                     break;
 
-    case TOK_WHILE: skptrace("WHILE");
-                    skprule(expr);
+    case TOK_INPUT: skpanyspaces();
+                    skpmatch("&I\5");
+                    skpany {
+                      skpmatch_("&*s,&*s");
+                      skpmatch("&I\5");
+                    }
+                    skpmatch_("&*s;&*s");
+                    break;
+
+    case TOK_WHILE: skprule(expr);
                     astlift;
                     skprule(bloc);
+                    astlift;
                     break;
   }
   skpor {
+    astinfo(TOK_LET);
     skpmatch("&I\4"); // Type 4 strings are identifier to be assigned
     skpmatch_("&*s=&*s");
     skprule(expr);

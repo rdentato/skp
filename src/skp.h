@@ -818,7 +818,10 @@ int ast_is(ast_t ast, int32_t node, char*rulename);
 int astisleaf(ast_t ast, int32_t node);
 
 #define astnumnodes(a) ((a)->nodes_cnt)
-void astprint(ast_t ast, FILE *f);
+void astprintsexpr(ast_t ast, FILE *f);
+void astprinttree(ast_t ast, FILE *f);
+
+#define astprint astprinttree
 
 #define ASTNULL -1
 int32_t astnextdf(ast_t ast, int32_t ndx);
@@ -1359,7 +1362,7 @@ int32_t astnodeinfo(ast_t ast, int32_t node)
   return ast->nodes[ast->par[node]].from;
 }
 
-void astprint(ast_t ast, FILE *f)
+void astprintsexpr(ast_t ast, FILE *f)
 {
   int32_t node = ASTNULL;
   while ((node = astnextdf(ast,node)) != ASTNULL) {
@@ -1381,6 +1384,31 @@ void astprint(ast_t ast, FILE *f)
   }
 }
 
+void astprinttree(ast_t ast, FILE *f)
+{
+  int32_t node = ASTNULL;
+  int32_t levl = 0;
+  while ((node = astnextdf(ast,node)) != ASTNULL) {
+    if (astisnodeentry(ast,node)) {
+      for (int k=0; k<levl; k+=4) fputs("    ",f);
+      fprintf(f,"[%s]",astnoderule(ast,node));
+      levl +=4;
+      if (astisleaf(ast,node)) {
+        fputc(' ',f); fputc('\'',f);
+        if (astnoderule(ast,node) == skp_N_INFO) {
+          fprintf(f,"%d",astnodeinfo(ast,node));
+        }
+        else for (char *s = astnodefrom(ast,node); s < astnodeto(ast,node); s++) {
+          if (*s == '\'') fputc('\\',f);
+          fputc(*s,f);
+        }
+        fputc('\'',f);
+      }
+      fputc('\n',f);
+    }
+    else levl -=4;
+  }
+}
 
 #endif // SKP_MAIN
 
