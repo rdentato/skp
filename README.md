@@ -138,7 +138,7 @@ For example:
 
 ## Level 2: Scanning
 The `skp` function greatly simplifies extracting elements from a text string.
-Sometimes, however, is more useful to continously a block of text.
+Sometimes, however, is more useful to continously match a block of text.
 
 There is a form of the skp function that does this:
 
@@ -156,7 +156,7 @@ Within the code guarded by skp
     int32_t skplen    length of the matched text
 ```
 
-You can thing of it as loop that will go through the text until all
+You can think of it as loop that will go through the text until all
 the text has been scanned or no match is found. For example:
 ```
    skp(csv) {
