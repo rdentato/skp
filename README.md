@@ -2,7 +2,7 @@
 
 Skp is a library of functions to help parsing text files.
 
-Rather that answering the question "which portion of the text match the pattern?", skp
+Rather than answering the question "which portion of the text match the pattern?", skp
 answer to the question "which portion of the text can be skipped to match the pattern?".
 The difference is subtle but is there.
 
