@@ -2,7 +2,7 @@
 
 Skp is a library of functions to help parsing text files.
 
-Rather that answering the question "which portion of the text match the pattern?", skp
+Rather than answering the question "which portion of the text match the pattern?", skp
 answer to the question "which portion of the text can be skipped to match the pattern?".
 The difference is subtle but is there.
 
@@ -11,7 +11,7 @@ the uppercase/lower case conversion is only for the ASCII portion of the Latin a
 
 Some of the Unicode spaces are recognized like U+00A0 (NO-BREAK SPACE), U+2001 (EM QUAD), etc.
 
-Default encoding is UTF-8, alternatively the IS-8859-15 encoding can be used.
+Default encoding is UTF-8, alternatively the ISO-8859-1 encoding can be used.
 
 Skp can be used at three increasing levels of complexity:
   - Skipping, where the focus is to identify portion of text that can be skipped according a pattern;
@@ -138,7 +138,7 @@ For example:
 
 ## Level 2: Scanning
 The `skp` function greatly simplifies extracting elements from a text string.
-Sometimes, however, is more useful to continously a block of text.
+Sometimes, however, is more useful to continously match a block of text.
 
 There is a form of the skp function that does this:
 
@@ -156,7 +156,7 @@ Within the code guarded by skp
     int32_t skplen    length of the matched text
 ```
 
-You can thing of it as loop that will go through the text until all
+You can think of it as loop that will go through the text until all
 the text has been scanned or no match is found. For example:
 ```
    skp(csv) {
