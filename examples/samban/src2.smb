@@ -1,15 +1,2 @@
-X = 3 ;
-
-input x,Y;
-
-if X > 3 then 
-  print X ;
-
-while X <> 0 {
-  if X < Y Then
-    print X ;
-  else {
-    print Y ;
-    X = Y;
-  }
-}
+x = 2;
+y = 3+1;

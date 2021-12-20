@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <setjmp.h>
+
 
 // Borrowed from vrg.h but renamed to minimize namespace pollution.
 #define skp_v_cnt(skp_v1,skp_v2,skp_v3,skp_v4,skp_v5,skp_v6,skp_vN, ...) skp_vN
@@ -547,15 +549,45 @@ extern char *skp_N_STR1;
 #define skp_N_STR6 (skp_N_STR1 + (5*4))
 #define skp_N_STR7 (skp_N_STR1 + (6*4))
 
-/*
+/* ## AST representation
 
-    +-------------,
-    ^             |
-    | |   | |     v
-    ( ( ) ( ( ) ) )
-    ^ ^-+ ^ ^-+ + +
-    |     '-----' |
-    '-------------'
+ The basic idea is that a tree is represented in its "parenthesized" form.
+ For exampke, the `(()())` tree has three nodes: the root and its two child:
+ This is represented as an array of integers: non negative numbers indicate an 
+open parenthesis, negative numbers a close one.
+ For example the array `{0,1.-1,2,-1,-5}` represents the tree `(()())`.
+ To summarize:
+ ```
+     O
+    / \  <-> (()()) <-> {0,1.-1,2,-1,-5}
+   O   O
+```
+
+  Negative numbers are used to point to the corresponding open parenthesis.
+You can check in the example above that this is the case. Not that a value
+of `-1` indicates that this is the closing parenthesis of a leaf.
+
+  The information stored in the tree is kept in a separate array of type
+`ast_node_t`. Elements of this array also contain a `delta` field which 
+represent the distance between the open parenthesis and its closing one.
+
+  In the picture below:
+    - the open parenthesis value is `i`
+    - the `delta` field of the node in position `i` contains `n`
+    - the close parenthesis is `n` element away from the open parenthesis
+    - the close parenthesis value is `-n`.
+
+```
+      i
+  [ … n  ──╮ … ]   ◄─── Array of ast_node_t
+      ▲    │
+      │    ▼ 
+      ( …… )       ◄─── Array of int32_t
+      i   -n
+      ▲    │
+      ╰────╯
+```
+
 */
 typedef struct ast_node_s {
   char   *rule;
@@ -577,8 +609,9 @@ typedef struct ast_mmz_s {
 typedef struct ast_s {
   char       *start;
   char       *err_rule;
+  char       *err_msg;
   ast_node_t *nodes;
-  ast_mmz_t  **mmz;
+  ast_mmz_t **mmz;
   int32_t    *par;  // ≥ 0 ⇒ Open parenthesis (index into the nodes array)
                     // < 0 ⇒ Closed parenthesis (delta to the open par.)
   int32_t     nodes_cnt;
@@ -590,11 +623,31 @@ typedef struct ast_s {
   int32_t     mmz_cnt;
   int32_t     mmz_max;
   int32_t     last_info;
-  int16_t     fail;
+  jmp_buf     jbuf;
+  uint16_t    depth;
+  int8_t      fail;
+  int8_t      flg;
 } *ast_t;
 
-char *asterrorrule(ast_t ast);
-char *asterror(ast_t ast);
+#define SKP_DEBUG     0x01
+#define SKP_LEFTRECUR 0x02
+#define SKP_MAXDEPTH  100
+
+#define skpdebug(...) skp_varg(skp_debug,__VA_ARGS__)
+#define skp_debug(a)  skp_debug2(a,0xFF)
+int skp_debug2(ast_t ast,uint8_t d);
+
+//  Getting error infomration
+char   *asterrrule(ast_t ast);   // ◄── Which rule we got the error
+char   *asterrpos(ast_t ast);    // ◄── Where the error has been detected
+
+//  The error message set with skperror() 
+#define asterrmsg(a) ((a)->err_msg)
+
+char *asterrline(ast_t ast);     // ◄── start of the line with the error
+// asterrlinenum  Line number
+
+int32_t asterrcolnum(ast_t ast);  // ◄── column number
 
 ast_t ast_new();
 ast_t astfree(ast_t ast);
@@ -604,8 +657,16 @@ int32_t ast_close(ast_t ast, int32_t to, int32_t open);
 
 typedef void (*skprule_t)(ast_t);
 
-ast_t skp_parse(char *src, skprule_t rule,char *rulename);
-#define skpparse(s,r)  skp_parse(s, skp_R_ ## r, skp_N_ ## r)
+ast_t skp_parse(char *src, skprule_t rule,char *rulename, int debug);
+
+#define skpparse(...)    skp_varg(skp_parse,__VA_ARGS__)
+#define skp_parse2(s,r)      skp_parse3(s,r,0)
+#define skp_parse3(s,r,d)    skp_parse(s, skp_R_ ## r, skp_N_ ## r,d)
+
+#define skpabort(...)  skp_abort(ast_cur_rule, (char *)(__VA_ARGS__ + 0))
+#define skp_abort(r,m)   skp__abort(ast_,m,r)
+
+void skp__abort(ast_t ast, char *msg,char *rule);
 
 #define skpdef(rule) \
     char *skp_N_ ## rule = #rule; \
@@ -668,6 +729,7 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename);
 #define skp_fcall(f,n) \
     if (!ast_->fail) { \
       char *ptr = ast_->start+ast_->pos;\
+      if (ast_->flg & SKP_DEBUG) skptrace("CALL: %s @%d",#f,ast_->pos); \
       int32_t info = f(&ptr); \
       int32_t par; \
       if (ptr == NULL) {ast_->fail = 1;} \
@@ -677,17 +739,20 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename);
         ast_->pos = (int32_t)(ptr-ast_->start); \
         if (info >= 0) par = ast_close(ast_,ast_->pos,par); \
       } \
+      if (ast_->flg & SKP_DEBUG) skptrace("RETURN: %s @%d fail: %d info: %d",#f,ast_->pos,ast_->fail, info); \
     } 
 
 #define skp_fcall_(f) \
     if (!ast_->fail) { \
       char *ptr = ast_->start+ast_->pos;\
+      if (ast_->flg & SKP_DEBUG) skptrace("CALL: %s @%d",#f,ast_->pos); \
       int32_t info = f(&ptr); \
       if (ptr == NULL) {ast_->fail = 1;} \
       else { \
         ast_->last_info = info; \
         ast_->pos = (int32_t)(ptr-ast_->start); \
       } \
+      if (ast_->flg & SKP_DEBUG) skptrace("RETURN: %s @%d fail: %d info: %d",#f,ast_->pos,ast_->fail, info); \
     } 
 
 typedef struct {
@@ -706,8 +771,11 @@ typedef struct {
       extern char *skp_N_ ## rule; \
       extern ast_mmz_t skp_M_ ## rule [4]; \
       void skp_R_ ## rule (ast_t ast_); \
+      char *ast_cur_rule = skp_N_ ## rule;\
       skp_save;\
-      if (!skp_dememoize(ast_, skp_M_ ## rule ,skp_N_ ## rule)) { \
+      if (ast_->flg & SKP_DEBUG) skptrace("ENTER: %s @%d",skp_N_ ## rule,ast_->pos); \
+      if (ast_->depth++ > SKP_MAXDEPTH) skp_abort(ast_cur_rule, skp_msg_leftrecursion);\
+      if (!skp_dememoize(ast_, skp_M_ ## rule, skp_N_ ## rule)) { \
         skp_R_ ## rule(ast_); \
         if (ast_->fail) { \
           if (ast_->err_pos < ast_->pos) { \
@@ -717,15 +785,20 @@ typedef struct {
         } \
         skp_memoize(ast_, skp_M_ ## rule ,skp_N_ ## rule, sav.pos, sav.par_cnt); \
       } \
+      if (ast_->flg & SKP_DEBUG) skptrace("EXIT: %s @%d fail: %d",skp_N_ ## rule,ast_->pos, ast_->fail); \
+      ast_->depth--; \
     } else (void)0
 
 #define skprule(rule) \
-    if (!ast_->fail) { \
+    if ((!(ast_->flg & SKP_LEFTRECUR)) && !ast_->fail) { \
       extern char *skp_N_ ## rule; \
       extern ast_mmz_t skp_M_ ## rule [4]; \
+      char *ast_cur_rule = skp_N_ ## rule;\
       void skp_R_ ## rule (ast_t ast_); \
       int32_t sav_par_cnt = ast_->par_cnt; \
       int32_t sav_pos = ast_->pos;\
+      if (ast_->flg & SKP_DEBUG) skptrace("ENTER: %s @%d",skp_N_ ## rule,ast_->pos); \
+      if (ast_->depth++ > SKP_MAXDEPTH) skp_abort(ast_cur_rule, skp_msg_leftrecursion);\
       if (!skp_dememoize(ast_, skp_M_ ## rule, skp_N_ ## rule)) { \
         int32_t par = ast_open(ast_,ast_->pos, skp_N_ ## rule); \
         skp_R_ ## rule(ast_); \
@@ -737,6 +810,8 @@ typedef struct {
         par = ast_close(ast_,ast_->pos,par); \
         skp_memoize(ast_, skp_M_ ## rule ,skp_N_ ## rule,sav_pos,sav_par_cnt); \
       } \
+      if (ast_->flg & SKP_DEBUG) skptrace("EXIT: %s @%d fail: %d",skp_N_ ## rule,ast_->pos, ast_->fail); \
+      ast_->depth--; \
     } else (void)0
 
 
@@ -748,7 +823,7 @@ typedef struct {
 //
 // Using two flags is really needed only for skpmany that has to
 // determine if it has succeeded at least once.
-
+#define skpgroup skponce
 #define skponce \
     if (ast_->fail) ;\
     else for (skp_save; \
@@ -783,7 +858,7 @@ typedef struct {
     if (ast_->fail) ;\
     else for (skp_save;\
               sav.flg & 2;\
-              ast_->fail = ast_->fail? (skp_restore, (sav.flg = 0)) \
+              ast_->fail = ast_->fail? (skp_restore, (sav.flg = 0) || (ast_->flg & SKP_LEFTRECUR)) \
                                      : skp_resave)
 // On fail, sav.flg will be 1 if it's the first time or 0 if we have succeeded
 // at least once (in which case `sav.flg=2` had cleared the first bit).
@@ -791,7 +866,7 @@ typedef struct {
     if (ast_->fail) ;\
     else for (skp_save;\
               sav.flg & 2;\
-              ast_->fail = ast_->fail? (skp_restore, (sav.flg &= 1) ) \
+              ast_->fail = ast_->fail? (skp_restore, (sav.flg &= 1)) \
                                      : ((sav.flg = 2), skp_resave))
 
 
@@ -836,8 +911,19 @@ char *astnodefrom(ast_t ast, int32_t node);
 char *astnodeto(ast_t ast, int32_t node);
 int32_t astnodelen(ast_t ast, int32_t node);
 
+extern char * skp_msg_leftrecursion;
+extern char * skp_msg_none;
 
+#define skpgeterrmsg() (ast_->err_msg)
+#define skpseterrmsg(m) skp_seterrmsg(ast_,m)
+static inline void skp_seterrmsg(ast_t ast, char *msg)
+{ ast->err_msg = msg ? msg : skp_msg_none ;}
+
+/****************************************************/
 #ifdef SKP_MAIN
+
+char *skp_msg_none = "";
+char *skp_msg_leftrecursion = "Left recursion detected";
 
 static int skp_par_makeroom(ast_t ast,int32_t needed);
 static int skp_nodes_makeroom(ast_t ast,int32_t needed);
@@ -981,24 +1067,33 @@ int skp_dememoize(ast_t ast, ast_mmz_t *mmz, char *rule)
   return 1;
 }
 
+int skp_debug2(ast_t ast,uint8_t d)
+{
+ switch(d) {
+   case  0: ast->flg &= ~SKP_DEBUG; break;
+   case  1: ast->flg |=  SKP_DEBUG; break;
+   default: ast->flg ^=  SKP_DEBUG; break;
+ }
+ return ast->flg & SKP_DEBUG;
+}
+
 char *skp_N_STR1 = "$1\0 $2\0 $3\0 $4\0 $5\0 $6\0 $7\0";
 char *skp_N_STR  = "$";
 char *skp_N_INFO = "#";
 
-ast_t skp_parse(char *src, skprule_t rule,char *rulename)
+ast_t skp_parse(char *src, skprule_t rule,char *rulename, int debug)
 {
   ast_t ast = NULL;
   int32_t open;
   if (!(ast = ast_new())) return NULL;
   ast->start = src;
-  ast->pos = 0;
-  ast->fail = 0;
-  ast->err_pos = -1;
-  ast->err_rule = NULL;
+  ast->flg = debug?SKP_DEBUG:0;
 
  _skptrace("Parsing %s",rulename);
   if ((open = ast_open(ast, ast->pos, rulename)) >= 0) {
-    rule(ast);
+    if (!setjmp(ast->jbuf)) rule(ast);
+    else  ast->fail = 1;
+
     if (ast->fail && ast->err_pos < ast->pos) {
       ast->err_pos = ast->pos; ast->err_rule = rulename;
     } 
@@ -1142,16 +1237,36 @@ int ast_is(ast_t ast, int32_t node, char*rulename)
   return nd->rule == rulename;
 }
 
-char *asterror(ast_t ast)
+char *asterrpos(ast_t ast)
 {
   if (!ast || ast->err_pos <0) return NULL;
   return ast->start+ast->err_pos;
 }
 
-char *asterrorrule(ast_t ast)
+char *asterrrule(ast_t ast)
 {
   if (!ast || ast->err_pos <0) return NULL;
   return ast->err_rule;
+}
+
+char *asterrline(ast_t ast)
+{ char *ln;
+  if (!ast || ast->err_pos <0) return NULL;
+  ln = ast->start+ast->err_pos;
+  while (ln>ast->start) {
+    if (ln[-1] == '\n' || ln[-1] == '\r')
+      break;
+    ln--;
+  }
+  return ln;
+}
+
+int32_t asterrcolnum(ast_t ast)
+{
+  if (!ast || ast->err_pos <0) return 0;
+  char *ln = asterrline(ast);
+  int32_t n =  ast->start+ast->err_pos - ln;
+  return (n);
 }
 
 char *astnoderule(ast_t ast, int32_t node)
@@ -1240,6 +1355,14 @@ ast_t ast_new()
                    free(ast->nodes);
                    free(ast);
                    return NULL; }
+
+  ast->pos      = 0;
+  ast->fail     = 0;
+  ast->depth    = 0;
+  ast->err_msg  = skp_msg_none;
+  ast->err_pos  = -1;
+  ast->err_rule = NULL;
+
   return ast;
 }
 
@@ -1391,6 +1514,7 @@ void astprinttree(ast_t ast, FILE *f)
   while ((node = astnextdf(ast,node)) != ASTNULL) {
     if (astisnodeentry(ast,node)) {
       for (int k=0; k<levl; k+=4) fputs("    ",f);
+//      fprintf(f,"[%s #%zX]",astnoderule(ast,node),(uintptr_t)astnoderule(ast,node));
       fprintf(f,"[%s]",astnoderule(ast,node));
       levl +=4;
       if (astisleaf(ast,node)) {
@@ -1408,6 +1532,14 @@ void astprinttree(ast_t ast, FILE *f)
     }
     else levl -=4;
   }
+}
+
+void skp__abort(ast_t ast, char *msg,char *rule)
+{
+  if (msg != (char *)0) ast->err_msg = msg; 
+  ast->err_pos = ast->pos;
+  ast->err_rule = rule;
+  longjmp(ast->jbuf,1);
 }
 
 #endif // SKP_MAIN

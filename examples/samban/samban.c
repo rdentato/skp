@@ -152,19 +152,19 @@ skpdef(bloc) {
   skponce {
     skpstring_("{");
     skpany {
-      skprule(statement);
+      skprule_(statement);
     }
     skpanyspaces();
     skpstring_("}");
   }
   skpor {
-    skprule(statement);
+    skprule_(statement);
   }
 }
 
 skpdef(program) {
   skpany {
-    skprule(statement);
+    skprule_(statement);
   }
   skpmatch_("&*s&!.");
 }
@@ -213,14 +213,23 @@ int main(int argc, char *argv[])
   if (source) {
     ast = skpparse(source,program);
 
-    if (asterror(ast)) {
-      trace("Error @: '%s'",asterror(ast));
-      trace("In rule: '%s'",asterrorrule(ast));
-    }
-    else {
-      astprint(ast,stdout);
-      printf("\n");
-    }
+   if (asterrpos(ast)) {
+    trace("In rule: '%s'",asterrrule(ast));
+    char *ln = asterrline(ast);
+    char *endln = ln;
+    while (*endln && *endln != '\r' && *endln != '\n') endln++;
+    int32_t col = asterrcolnum(ast);
+    trace("Error %s",asterrmsg(ast));
+    trace("%.*s",(int)(endln-ln),ln);
+    trace("%.*s^",col,"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+    //trace("Error '%s'",asterrmsg(ast));
+    //trace("@: '%s'",asterrpos(ast));
+  }
+  else {
+    astprint(ast,stdout);
+    printf("\n");
+  }
+  
   
     free(source);
     astfree(ast);
