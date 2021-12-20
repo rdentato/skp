@@ -828,19 +828,19 @@ typedef struct {
     if (ast_->fail) ;\
     else for (skp_save; \
               sav.flg & 2; \
-              sav.flg = ast_->fail?(skp_restore,0):0)
+              sav.flg = (ast_->fail?(skp_restore,0):0))
 
 #define skpor \
     if (!ast_->fail || (ast_->fail = 0)) ;\
     else for (skp_save; \
               sav.flg & 2; \
-              sav.flg = ast_->fail?(skp_restore,0):0)
+              sav.flg = (ast_->fail?(skp_restore,0):0))
 
 #define skpmaybe \
     if (ast_->fail) ;\
     else for (skp_save;\
               sav.flg & 2;\
-              sav.flg = ast_->fail?(skp_restore,0):0, ast_->fail = 0)
+              sav.flg = (ast_->fail?(skp_restore,0):0, ast_->fail = 0))
 
 #define skpnot \
     if (ast_->fail) ;\
@@ -858,16 +858,16 @@ typedef struct {
     if (ast_->fail) ;\
     else for (skp_save;\
               sav.flg & 2;\
-              ast_->fail = ast_->fail? (skp_restore, (sav.flg = 0) || (ast_->flg & SKP_LEFTRECUR)) \
-                                     : skp_resave)
+              ast_->fail = (ast_->fail? (skp_restore, (sav.flg = 0) || (ast_->flg & SKP_LEFTRECUR)) \
+                                      : skp_resave))
 // On fail, sav.flg will be 1 if it's the first time or 0 if we have succeeded
 // at least once (in which case `sav.flg=2` had cleared the first bit).
 #define skpmany \
     if (ast_->fail) ;\
     else for (skp_save;\
               sav.flg & 2;\
-              ast_->fail = ast_->fail? (skp_restore, (sav.flg &= 1)) \
-                                     : ((sav.flg = 2), skp_resave))
+              ast_->fail = (ast_->fail? (skp_restore, (sav.flg &= 1)) \
+                                      : ((sav.flg = 2), skp_resave)))
 
 
 void skp_memoize(ast_t ast, ast_mmz_t *mmz,char *rule, int32_t old_pos, int32_t start_par);
