@@ -26,7 +26,6 @@ by one:
 
 skpdef(eval) {
   skprule(expr);
-    skp_trace("EXPR: %d",ast_->fail);
   skpmatch("&!.\7"); // Ensure all input is consumed
 }
 

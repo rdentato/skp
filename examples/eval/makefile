@@ -1,7 +1,8 @@
 
 TOP = ../..
 
-TOP=../..
+CC=gcc
+#CC=clang
 
 OPT=-O2
 #OPT=-ggdb3 -O0
