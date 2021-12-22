@@ -268,10 +268,15 @@ You can prevent a node to be generated using a variant of the skp... functions
 
 There also the following ast modifiers:
 ```
-  astswap;     swap last two nodes in a branch
-  astlift;     replace a node with its only child (if it has a single child).
-  astinfo(n);  add an INFO node with the specified value.
-  astnoleaf;   remove previous node if it's a leaf.
+  - astswap;         swap last record with its left sibling;
+  - astlift;         replace a node with its only child;
+  - astliftall;      replace a node with all its children;
+  - astinfo(n);      add an INFO node with the specified value;
+  - astnoleaf;       remove previous node if it's a leaf;
+  - astnoemptyleaf;  remove previous node if it's a leaf and it's empty;
+  - astlastnode;     returns a pointer to last node (of type ast_node_t *); 
+  - astremove;       deletes the last node;
+  - astlastnodeisempty returns true if the text matched by last 
 ```
 
 ### AST traversing
