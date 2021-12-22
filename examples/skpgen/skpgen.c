@@ -1,4 +1,3 @@
-
 #define SKP_MAIN
 #include "skp.h"
 
@@ -7,14 +6,15 @@
 // ruledef = rulename _'&*s=&*s' alt _'&*s;' ;
 // alt = seq (_'&*s/' seq)* ;
 // seq = (_'&*s' match)+ ;
-// match = string repeat? /  subdef repeat? / '&[!&]' _'&*s' match ;
-// subdef = _'(' alt _'&*s)' / '&?[^_<]' rulename ;
+// match = string repeat? /  match_term repeat? / '&[!&]' _'&*s' match ;
+// match_term = _'(' alt _'&*s)' / '&?[^_<]' rulename ;
 // repeat = _"&*s" "&[*+?]" ;
 // string = '&?[_]' "&Q" ;
 // rulename = "&I" ;
 // spc = (&+s / '#&N')*
+skpdef(pippo)
 */
-
+// skpdef(pluto)
 // grammar = (_'&*s' ruledef)+  _'&*s&!.' ;
 skpdef(grammar) {
   skprule_(spc_);
@@ -27,7 +27,7 @@ skpdef(grammar) {
 
 skpdef(ruledef) {
   skpmatch("&I\7"); skprule_(spc_); skpmatch_("=");
-                    skprule_(alt); astlift; 
+                    skprule_(alt); //astlift; 
                     skprule_(spc_); skpmatch_(";");
 }
 
@@ -47,33 +47,135 @@ skpdef(alt_or) {
 
 // seq = (_'&*s' match)+ ;
 skpdef(seq) {
-  skpmany{ skprule_(spc_); skprule(match); }
+  skpmany{ skprule_(spc_); skprule_(match); }
 }
 
-// match = string repeat? /  subdef repeat? / '&[!&]' match ;
+// match =  match_term repeat? / '&[!&]\4' match / _'#' '&D';
+// match_term = string / _'(' _spc_ alt _spc_ _')' / '_\5<\5^^\5^' rulenameref ;
 // repeat = _"&*s" "&[*+?]" ;
 // string = '&?[_]' "&Q" ;
 skpdef(match) {
-  skponce{ skpmatch("&?[_]\5"); skpmatch("&Q\3"); skpmatch("&?[+*?]\6"); astswap;}
-    skpor{ skprule(subdef); skpmatch("&?[+*?]\6"); astswap; } 
-    skpor{ skpmatch("&[!&]\4"); skprule(match); }
+  skponce { skprule(match_term); skpmatch("&?[+*?]\6");
+            if (astlastnodeisempty) astremove;
+            else astswap; 
+            astliftall;
+          } 
+    skpor { skpmatch("&[!&]\4"); skprule_(match); }
+    skpor { skpstring_("#"); skpmatch("&D"); }
 }
  
-// subdef = _'(' alt _'&*s)' / '&?[^_<]' rulename ;
+// match_term = _'(' alt _'&*s)' / '&?[^_<]' rulename ;
 // rulename = "&I" ;
-skpdef(subdef) {
-  skponce{ 
-    skpstring_("("); skprule_(spc_); skprule_(alt); skprule_(spc_); skpstring_(")");
-  }
-  skpor {
-    skpmatch("&?[^_<]\5"); skpmatch("&I\2");
+skpdef(match_term) {
+  skponce { skpmatch("&?[_]\5"); astnoemptyleaf; skpmatch("&Q\3"); }
+    skpor { skpmatch("&?[^_<]\5");  astnoemptyleaf; skpmatch("&I\2"); }
+    skpor { skpstring_("("); skprule_(spc_); 
+            skprule(alt); astlift; astlift; 
+            skprule_(spc_); skpstring_(")");
+          }
+}
+
+// spc = (&+s / '//&N')*
+skpdef(spc_) { skpany{ skpmatch_("&+s\1//&N"); } }
+skpdef(spc) { skpmany{ skpmatch_("&+s\1//&N"); } }
+
+/************************************/
+void prtrepeat(char repeat)
+{
+  switch (repeat) {
+    case '*' : printf("skpany {\n"); break;
+    case '+' : printf("skpmany {\n"); break;
+    case '?' : printf("skpmaybe {\n"); break;
   }
 }
 
-// spc = (&+s / '#&N')*
-skpdef(spc_) { skpany{ skpmatch_("&+s\1#&N"); } }
-skpdef(spc) { skpmany{ skpmatch_("&+s\1#&N"); } }
+uint8_t altstk[256];
+uint8_t stkcnt = 0;
+#define push(n) (altstk[stkcnt++] = (n))
+#define pop()   (altstk[--stkcnt])
 
+void generatecode(ast_t ast)
+{
+  int rules = 0;
+  char modifier = '\0';
+  char repeat = '\0';
+  uint8_t rpt;
+  
+  astvisitdf(ast, node) {
+    astonentry(ast,node) {
+ 
+      astifnodeis(grammar) {
+        printf("#include \"skp.h\"\n\n");
+      }
+
+      astifnodeis(STR7) {
+        if (rules++ >0) printf("}\n\n");
+        printf("skpdef(%.*s){\n",astnodelen(ast,node),astnodefrom(ast,node));
+      }
+
+      astifnodeis(STR5) {
+        modifier = *astnodefrom(ast,node);
+      }
+
+      astifnodeis(STR6) { 
+        repeat = *astnodefrom(ast,node);
+      }
+
+      astifnodeis(STR2) {
+        if (repeat) prtrepeat(repeat);
+        printf("skprule%s",modifier == '_' ? "_":"");
+        printf("(%.*s);",astnodelen(ast,node),astnodefrom(ast,node));
+        if (modifier == '<') printf(" astswap;");
+        printf("\n");
+        if (repeat) printf("}\n");
+        repeat = '\0';
+        modifier = '\0';
+      }
+
+      astifnodeis(STR3) { 
+        if (repeat) prtrepeat(repeat);
+        printf("skpmatch%s",modifier == '_' ? "_":"");
+        printf("(%.*s);\n",astnodelen(ast,node),astnodefrom(ast,node));
+        if (repeat) printf("}\n");
+        repeat = '\0';
+        modifier = '\0';
+      }
+
+      astifnodeis(alt) {
+        rpt = 0;
+        if (repeat) { prtrepeat(repeat); rpt++;}
+        push(rpt);
+        repeat = '\0';
+      }
+
+      astifnodeis(alt_once) {
+        rpt = 0;
+        if (repeat) { prtrepeat(repeat); rpt++;}
+        if (astnodeis(ast,astright(ast,node),alt_or)) {
+          printf("skponce {\n");
+          rpt++;
+        }
+        push(rpt);
+        repeat = '\0';
+      }
+
+      astifnodeis(alt_or) {
+        printf("skpor {\n");
+        push(1);
+        repeat = '\0';
+      }
+    }
+    astonexit(ast, node) {
+      astifnodeis(alt_or, alt_once, alt) {
+        rpt = pop();
+        while (rpt-- > 0) printf("}\n");
+      }
+    }
+  }
+  if (rules >0 ) printf("}\n");
+}
+
+/************************************/
 
 char *loadsource(char *fname)
 {
@@ -102,6 +204,7 @@ char *loadsource(char *fname)
   
   return src;
 }
+
 #define trace(...) (fprintf(stderr,__VA_ARGS__),fputc('\n',stderr))
 void usage()
 {
@@ -127,15 +230,17 @@ int main(int argc, char *argv[])
     char *endln = ln;
     while (*endln && *endln != '\r' && *endln != '\n') endln++;
     int32_t col = asterrcolnum(ast);
-    trace("Error %s",asterrmsg(ast));
+    trace("Error: %s",asterrmsg(ast));
     trace("%.*s",(int)(endln-ln),ln);
     trace("%.*s^",col,"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
     //trace("Error '%s'",asterrmsg(ast));
     //trace("@: '%s'",asterrpos(ast));
   }
   else {
-    astprint(ast,stdout);
-    printf("\n");
+    astprint(ast,stderr);
+    fprintf(stderr,"\n");
+
+    generatecode(ast);
   }
   
   free(source);

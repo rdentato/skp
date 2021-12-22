@@ -1,9 +1,10 @@
-# \7 -> ruledef
-# \6 -> repeat
-# \5 -> ast
-# \4 -> lookahead (& !)
-# \3 -> match (string)
-
+// \7 -> ruledef
+// \6 -> repeat
+// \5 -> ast
+// \4 -> lookahead (& !)
+// \3 -> match (string)
+// \2 -> ruleref
+// \1 -> info
 
 grammar = (_spc_ _ruledef)+  _'&*s&!.' ;
 ruledef = rulenamedef _spc_ _'=' _spc_ ^alt ;
@@ -14,12 +15,13 @@ alt_once = _seq ;
 alt_or = _seq ;
 
 seq = (_spc_ match)+ ;
-match = string repeat? /  ^submatch repeat? / '&[!&]\4' _spc_ match ;
+match =  match_term repeat? / '&[!&]\4' match / _'#' '&D';
 
-submatch = _'(' _spc_ alt _spc_ _')' / '&[^_<]\5' rulenameref ;
+match_term = string / _'(' _spc_ alt _spc_ _')' / '_\5<\5^^\5^' rulenameref ;
 rulenameref = "&I\2" ;
-repeat = _"&*s" "&[*+?]\6" ;
-string = '&?[_]' "&Q\3" ;
-spc_ = ("&+s" / '#&N')* ;
-spc  = ("&+s" / '#&N')+ ;
+repeat = "&[*+?]\6" ;
+
+string = '&?[_]\5' "&Q\3" ;
+spc_ = ("&+s" / '//&N')* ;
+spc  = ("&+s" / '//&N')+ ;
 
