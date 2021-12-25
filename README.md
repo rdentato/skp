@@ -65,6 +65,7 @@ Special match patterns are introduced by the `&` character.
    n  newline
 
    
+   ' " or ` a literal string (useful for optional and negatives)
    Q  Quoted string with '\' as escape
    B  Balanced sequence of parenthesis (can be '()''[]''{}')
    () Balanced parenthesis (only '()')

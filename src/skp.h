@@ -23,8 +23,8 @@
 
 
 // Borrowed from vrg.h but renamed to minimize namespace pollution.
-#define skp_v_cnt(skp_v1,skp_v2,skp_v3,skp_v4,skp_v5,skp_v6,skp_vN, ...) skp_vN
-#define skp_v_argn(...)  skp_v_cnt(__VA_ARGS__, 6, 5, 4, 3, 2, 1, 0)
+#define skp_v_cnt(skp_v1,skp_v2,skp_v3,skp_v4,skp_v5,skp_v6,skp_v7,skp_v8,skp_vN, ...) skp_vN
+#define skp_v_argn(...)  skp_v_cnt(__VA_ARGS__, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 #define skp_v_cat0(x,y)  x ## y
 #define skp_v_cat(x,y)   skp_v_cat0(x,y)
 #define skp_varg(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
@@ -229,6 +229,16 @@ static int is_oneof(uint32_t ch, char *set, int iso)
   return 0;
 }
 
+static int is_string(char *s, char *p, int len)
+{
+  while (len--) {
+    if (*s != *p) return 0;
+    if (*s == '\0') return 1;
+    s++; p++;
+  }
+  return 1;
+}
+
 static uint32_t get_close(uint32_t open)
 {
    switch(open) {
@@ -322,6 +332,16 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
                  pat++;
                  break;
 
+      case '"' : case '\'': case '`': {
+                 int l = 0; uint32_t quote = pat[-1];
+                 while (pat[l] && pat[l] != quote) l++;
+                 if (l>0 && (is_string(s_end,pat,l) != match_not)) { s_end += l; ret = MATCHED; }
+                 else if (match_min == 0) ret = MATCHED;
+                 pat += l+1;
+                 break;  
+               }
+               
+    
       case 'C' : *flg = (*flg & ~1) | match_not; ret = MATCHED;
                 _skptrace("FOLD: %d",*flg & 1);
                  break;
@@ -528,6 +548,7 @@ int skp_(char *src, char *pat, char **to,char **end)
     return ret;
   }
 
+  if (to)  *to  = src;
   if (end) *end = src;
   return 0;
 }
@@ -910,7 +931,16 @@ int32_t astlast(ast_t ast, int32_t node);  // rightmost sibling
 
 #define astlastinfo (ast_->last_info)
 
-#define astnodeis(a,n,r) ast_is(a,n,skp_N_ ## r)
+#define astnodeis(...) skp_varg(ast_nodeis,__VA_ARGS__)
+#define ast_nodeis1(a)   skp_zero
+#define ast_nodeis2(a,n) skp_zero
+#define ast_nodeis3(a,n,r1)             ast_isn(a,n, skp_N_ ## r1, NULL, NULL, NULL, NULL)
+#define ast_nodeis4(a,n,r1,r2)          ast_isn(a,n, skp_N_ ## r1, r2,   NULL, NULL, NULL)
+#define ast_nodeis5(a,n,r1,r2,r3)       ast_isn(a,n, skp_N_ ## r1, r2,     r3, NULL, NULL)
+#define ast_nodeis6(a,n,r1,r2,r3,r4)    ast_isn(a,n, skp_N_ ## r1, r2,     r3,   r4, NULL)
+#define ast_nodeis7(a,n,r1,r2,r3,r4,r5) ast_isn(a,n, skp_N_ ## r1, r2,     r3,   r4,   r5)
+
+int ast_isn(ast_t ast, int32_t node, char*r1, char*r2, char*r3, char*r4, char*r5);
 int ast_is(ast_t ast, int32_t node, char*rulename);
 int astisleaf(ast_t ast, int32_t node);
 
@@ -923,8 +953,6 @@ void astprinttree(ast_t ast, FILE *f);
 #define ASTNULL -1
 int32_t astnextdf(ast_t ast, int32_t ndx);
 
-#define astvisitdf(a,n) for (int32_t n=ASTNULL; (n=astnextdf(a,n)) != ASTNULL; )
-
 int astisnodeentry(ast_t ast, int32_t ndx);
 int astisnodeexit(ast_t ast, int32_t ndx);
 
@@ -933,6 +961,22 @@ typedef struct {
   int32_t node;
   char   *rule;
 } ast_case_t;
+
+#define astcur     ast_cur.ast
+#define astcurnode ast_cur.node
+#define astcurrule ast_cur.rule
+#define astcurfrom astnodefrom(astcur,astcurnode)
+#define astcurto   astnodeto(astcur,astcurnode)
+
+#define astvisit(a) for (ast_case_t ast_cur = {a, ASTNULL, NULL}; \
+                         ((astcurnode = astnextdf(a,astcurnode)) != ASTNULL) && \
+                         (astcurrule = astnoderule(ast_cur.ast, astcurnode)) ; )
+
+#define astifentry  if (!astisnodeentry(ast_cur.ast,ast_cur.node)) ; else
+#define astifexit   if (!astisnodexit(ast_cur.ast,ast_cur.node)) ; else
+
+
+#define astvisitdf(a,n) for (int32_t n=ASTNULL; (n=astnextdf(a,n)) != ASTNULL; )
 
 #define astonentry(a,n) for (ast_case_t ast_cur = {a, n, NULL}; \
                              ast_cur.node >= 0 && astisnodeentry(ast_cur.ast,ast_cur.node) && \
@@ -1468,6 +1512,17 @@ int ast_is(ast_t ast, int32_t node, char*rulename)
   }
   return nd->rule == rulename;
 }
+
+int ast_isn(ast_t ast, int32_t node, char*r1, char*r2, char*r3, char*r4, char*r5)
+{
+  return    ast_is(ast,node,r1)
+         || ast_is(ast,node,r2)
+         || ast_is(ast,node,r3)
+         || ast_is(ast,node,r4)
+         || ast_is(ast,node,r5)
+         ;
+}
+
 
 char *asterrpos(ast_t ast)
 {
