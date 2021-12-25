@@ -13,7 +13,7 @@ opmult = '*'|'/'|'%'
 */
 
 skpdef(eval) {
-  skprule(expr); astlift;
+  skprule_(expr);
   skpmatch_("&*s&!."); // Ensure all input is consumed
 }
 
@@ -27,10 +27,10 @@ skpdef(expr) {
 }
 
 skpdef(term) {
-  skprule_(fact);
+  skprule(fact); astlift;
   skpany {
     skprule_(op_mult);
-    skprule_(fact);
+    skprule(fact); astlift;
     astswap;
   }
 }
@@ -71,13 +71,13 @@ int32_t calc(ast_t ast)
 {
   int32_t a,b;
   empty();
-  astvisitdf(ast,node) {
-    astonentry(ast,node) {
+  astvisit(ast) {
+    astifentry {
       astifnodeis(STR2) {
-        push(atoi(astnodefrom(ast,node)));
+        push(atoi(astcurfrom));
       }
       astifnodeis(STR1) {
-        switch(*astnodefrom(ast,node)) {
+        switch(*astcurfrom) {
           case '+' : a = pop(); b = pop(); push(a+b);
                      break;
 
@@ -104,6 +104,7 @@ int32_t calc(ast_t ast)
 int main(int argc, char *argv[])
 {
   ast_t ast;
+  printf("nodesize: %ld\n",sizeof(ast_node_t));
 
   if (argc<2) {fprintf(stderr,"string?\n"); return 1;}
 
