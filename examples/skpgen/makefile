@@ -18,11 +18,17 @@ all: skpgen skphdr
 skpgen: skpgen.o
 	$(CC) -o $@ $< $(LNFLAGS) 
 
-skpgen2: skpgen2.o
-	$(CC) -o $@ $< $(LNFLAGS) 
-
 skphdr: skphdr.o
 	$(CC) -o $@ $< $(LNFLAGS)
 
+expr: expr.o expr_main.o
+
+expr.o: expr.c
+	$(CC) -c $(CFLAGS) -DSKP_MAIN $<
+
+expr.c: skpgen expr.skp
+	./skpgen expr
+
 clean:
 	$(RM) *.o skpgen skphdr
+	$(RM) expr expr.o expr.c expr.t

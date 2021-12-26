@@ -1,0 +1,36 @@
+// Expressions
+// 
+// \2 -> Binary operation
+// \3 -> Unary operation
+// \4 -> Variable assign
+// \5 -> Variable reference
+// \6 -> Decimal number
+// \7 -> Hex number
+
+expr = ^^exprterm ; // _"&*s&!."
+
+exprterm = ^^relterm (_relop <^^relterm)*;
+
+relop   = _spc_ "==\2!=\2<=\2<\2>=\2>\2" _spc_;
+relterm = ^^addterm (_addop <^^addterm)*;
+
+addop   = _spc_ "+\2-\2" _spc_ ;
+addterm = ^^multerm (_multop <^^multerm)*;
+
+multop  = _spc_ "*\2/\2%\2" _spc_ ;
+multerm = ^^term (_bitop <^^term)*;
+
+bitop   = _spc_ "&&\2|\2^\2" _spc_ ;
+
+term = _assign
+     / _varref
+     / _number
+     / _"(&*s" ^^exprterm+ _"&*s)"
+     / "-&*s\3~&*s\3" <^^term
+     ;
+
+varref = "&I\5" ;
+assign = "&I\4" _"&*s=&!@=" _spc_ <^^expr;
+number = "0&[xX]&X\7&F\6";
+spc_ = _"&*s";
+
