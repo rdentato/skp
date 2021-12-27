@@ -71,13 +71,13 @@ int32_t calc(ast_t ast)
 {
   int32_t a,b;
   empty();
-  astvisitdf(ast,node) {
-    astonentry(ast,node) {
+  astvisit(ast) {
+    astifentry {
       astifnodeis(STR2) {
-        push(atoi(astnodefrom(ast,node)));
+        push(atoi(astcurfrom));
       }
       astifnodeis(STR1) {
-        switch(*astnodefrom(ast,node)) {
+        switch(*astcurfrom) {
           case '+' : a = pop(); b = pop(); push(a+b);
                      break;
 
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 
   ast = skpparse(argv[1],eval);
   
-  if (asterrpos(ast)) {
+  if (asthaserr(ast)) {
     trace("In rule: '%s'",asterrrule(ast));
     char *ln = asterrline(ast);
     char *endln = ln;
