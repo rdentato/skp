@@ -176,22 +176,22 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
       }
 
       astifnodeis(STR2) {
-        if (repeat) { prtrepeat(repeat,indent,src); indent += 2; }
+        if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
         fprintf(src,"%*.sskprule%s", indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
         fprintf(src,"(%.*s);", astcurlen, astcurfrom);
         prtmodifier(modifier,src);
         fprintf(src,"\n");
-        if (repeat) {indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
+        if (repeat) { indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
         repeat = '\0';
         modifier = 0;
       }
 
       astifnodeis(STR3) { 
-        if (repeat) { prtrepeat(repeat,indent,src); indent += 2; }
+        if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
         fprintf(src,"%*sskpmatch%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
         fprintf(src,"(%.*s);\n",astcurlen,astcurfrom);
         prtmodifier(modifier,src);
-        if (repeat) { indent-=2 ;fprintf(src,"}\n"); }
+        if (repeat) { indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
         repeat = '\0';
         modifier = 0;
       }
