@@ -18,7 +18,10 @@ skpdef(pippo)
 // grammar = (_'&*s' ruledef)+  _'&*s&!.' ;
 skpdef(grammar) {
   skprule_(spc_);
-  skpmany{ skprule_(ruledef); skprule_(spc_); }
+  skpmany{       skprule(code); 
+           skpor skprule_(ruledef);
+           skprule_(spc_);
+         }
   skpmatch_("&!.");
 }
 
@@ -26,10 +29,12 @@ skpdef(grammar) {
 // rulename = "&I" ;
 
 skpdef(ruledef) {
-  skpmatch("&I\7"); skprule_(spc_); skpmatch_("=");
-                    skprule_(alt); //astlift; 
-                    skprule_(spc_); skpmatch_(";");
+  skprule(rulename); skprule_(spc_); skpmatch_("=");
+                     skprule_(alt); //astlift; 
+                     skprule_(spc_); skpmatch_(";");
 }
+
+skpdef(rulename) { skpmatch_("&I"); }
 
 // alt =  alt_once ( _spc_ _'&*s/' alt_or)* ;
 skpdef(alt) {
@@ -55,19 +60,26 @@ skpdef(seq) {
 // repeat = _"&*s" "&[*+?]" ;
 // string = '&?[_]' "&Q" ;
 skpdef(match) {
-  skponce { skprule(match_term); skpmatch("&?[+*?]\6");
+  skponce { skprule(match_term); skprule(repeat);
             astswapnoempty;
             astliftall;
           } 
+    skpor { skprule(code); }
     skpor { skpmatch("&[!&]\4"); skprule_(match); }
 }
  
+skpdef(repeat) { skpmatch_("&?[+*?]"); }
+
 // match_term = _'(' alt _'&*s)' / '&?[^_<]' rulename ;
 // rulename = "&I" ; skpmatch("&*[^_<]\5"); 
 
 skpdef(match_term) {
-  skponce { skprule_(modifier); astnoemptyleaf; skpmatch("&Q\3"); }
-    skpor { skprule_(modifier); astnoemptyleaf; skpmatch("&I\2"); }
+  skponce { skprule(modifier); astnoemptyleaf;
+            skponce { skprule(pattern); }
+              skpor { skprule(chkfun); skpmatch_("&*s[&*s]&*s"); }
+              skpor { skprule(lookup); }
+              skpor { skprule(ruleref); } 
+          }
     skpor { skpstring_("("); skprule_(spc_); 
             skprule(alt); astliftall;
             skprule_(spc_); skpstring_(")");
@@ -75,12 +87,40 @@ skpdef(match_term) {
     skpor { skpstring_("#"); skpmatch("&D"); /*skptrace("INFO: %d %d",astfailed, *astcurfrom);*/ }
 }
 
-
+skpdef(ruleref)  { skpmatch_("&I&!@&*s:"); }
+skpdef(pattern)  { skpmatch_("&Q"); }
 skpdef(modifier) {
-    skpmatch("&?'_'&?[!?]&?'<'&?'?'&?'^'&?'^'\5");
+    skpmatch_("&?'_'&?[!?]&?'<'&?'?'&?'^'&?'^'");
 }
 
-// spc = (&+s / '//&N')*
+skpdef(chkfun) { skpmatch_("&I"); };
+
+// lkup [ TOK: expr; expr; TOK2: expr; ]
+
+skpdef(lookup) {
+  skprule(lu_func);
+  skpmatch_("&*s[");
+  skpmany {
+    skprule_(spc_);
+    skprule(lu_case);
+    skpmatch_("&*s:&*s");
+    skprule(alt_case);
+    skprule_(spc_);
+    skpmatch_(";");
+   _skptrace("lkup %d '%.4s'",astfailed,astcurfrom);
+  }
+  skpmatch_("&*s]");
+}
+
+skpdef(lu_func) { skpmatch_("&I") ;}
+skpdef(lu_case) { skpmatch_("&I\1&D"); }
+skpdef(alt_case) { skprule_(alt); }
+
+skpdef(code) {
+  skpmatch_("&@{");
+  skpmatch_("&B");
+}
+
 skpdef(spc_) { skpany{ skpmatch_("&+s\1//&N"); } }
 skpdef(spc) { skpmany{ skpmatch_("&+s\1//&N"); } }
 
@@ -136,7 +176,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
         fprintf(src,"#include \"skp.h\"\n\n");
       }
 
-      astifnodeis(STR7) {
+      astifnodeis(rulename) {
         if (rules++ >0) fprintf(src,"}\n\n");
         fprintf(src,"skpdef(%.*s) {\n",astcurlen, astcurfrom);
         indent = 2;
@@ -151,7 +191,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
       // _  flat (don't build node)
       // _? flat (don't buoild node) if leaf 
       // _! flat if empty match
-      astifnodeis(STR5) {
+      astifnodeis(modifier) {
         modifier = 0;
         for (char *c = astcurfrom; c<astcurto; c++) {
           switch (*c) {
@@ -171,11 +211,11 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
         }
       }
 
-      astifnodeis(STR6) { 
+      astifnodeis(repeat) { 
         repeat = *astcurfrom;
       }
 
-      astifnodeis(STR2) {
+      astifnodeis(ruleref) {
         if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
         fprintf(src,"%*.sskprule%s", indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
         fprintf(src,"(%.*s);", astcurlen, astcurfrom);
@@ -186,16 +226,43 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
         modifier = 0;
       }
 
-      astifnodeis(STR3) { 
+      astifnodeis(pattern) { 
         if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
         fprintf(src,"%*sskpmatch%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
-        fprintf(src,"(%.*s);\n",astcurlen,astcurfrom);
+        fprintf(src,"(%.*s);",astcurlen,astcurfrom);
         prtmodifier(modifier,src);
+        fprintf(src,"\n");
         if (repeat) { indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
         repeat = '\0';
         modifier = 0;
       }
 
+      astifnodeis(chkfun) { 
+        if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
+        fprintf(src,"%*sskpcheck%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
+        fprintf(src,"(%.*s);",astcurlen,astcurfrom);
+        prtmodifier(modifier,src);
+        fprintf(src,"\n");
+        if (repeat) { indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
+        repeat = '\0';
+        modifier = 0;
+      }
+
+      astifnodeis(lu_func) {
+        rpt = 0;
+        if (repeat) { prtrepeat(repeat, indent, src); rpt++;}
+        fprintf(src,"%*sskplookup(%.*s) {\n",indent,skpemptystr,astcurlen,astcurfrom);
+        rpt++;
+        indent += 2*rpt;
+        push(rpt);
+        repeat = '\0';
+      }
+
+      astifnodeis(lu_case) {
+        fprintf(src,"%*scase %.*s:\n",indent,skpemptystr,astcurlen,astcurfrom);
+        indent +=4;
+      }
+      
       astifnodeis(alt) {
         rpt = 0;
         if (repeat) { prtrepeat(repeat, indent, src); rpt++;}
@@ -221,11 +288,20 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
         push(1);
         repeat = '\0';
       }
+
+      astifnodeis(code) {
+        if (rules >0) { fprintf(src,"}\n\n"); indent = 0; rules = 0; }
+        fprintf(src,"%.*s",astcurlen-2,astcurfrom+1);
+      }
     }
     astifexit {
-      astifnodeis(alt_or, alt_once, alt) {
+      astifnodeis(alt_or, alt_once, alt, lookup) {
         rpt = pop();
         while (rpt-- > 0) {indent -=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
+      }
+      astifnodeis(alt_case) {
+        fprintf(src,"%*sbreak;\n",indent,skpemptystr);
+        indent -=4;
       }
     }
   }
@@ -286,7 +362,7 @@ int main(int argc, char *argv[])
 
   if (!grammarbuf) usage();
 
-  ast = skpparse(grammarbuf,grammar);
+  ast = skpparse(grammarbuf,grammar,0);
 
   if (asthaserr(ast)) {
     trace("In rule: '%s'",asterrrule(ast));
