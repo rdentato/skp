@@ -753,6 +753,9 @@ void skp__abort(ast_t ast, char *msg,char *rule);
 #define skpanyblanks()  skpmatch_("&*w");
 #define skpmanyblanks() skpmatch_("&+w");
 
+#define skpcur *skp_cur
+#define skpfunc(f) int32_t f(char **skp_cur)
+
 #define skplookup(...)      skp_varg(skp_lookup,__VA_ARGS__)
 #define skp_lookup1(f)      skp_lookup2(f,1)
 #define skp_lookup2(f,n)    skp_fcall(f,n) \
