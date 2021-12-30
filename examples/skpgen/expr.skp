@@ -1,36 +1,46 @@
 // Expressions
-// 
-// \2 -> Binary operation
-// \3 -> Unary operation
-// \4 -> Variable assign
-// \5 -> Variable reference
-// \6 -> Decimal number
-// \7 -> Hex number
 
-expr = ^^exprterm ; // _"&*s&!."
+{ /* this is a comment */ }
 
-exprterm = ^^relterm (_relop <^^relterm)*;
+expr = ^^exprterm;
 
-relop   = _spc_ "==\2!=\2<=\2<\2>=\2>\2" _spc_;
-relterm = ^^addterm (_addop <^^addterm)*;
+exprterm = ^^logterm (_spc_ logop ^^logterm)*;
 
-addop   = _spc_ "+\2-\2" _spc_ ;
-addterm = ^^multerm (_multop <^^multerm)*;
+logop   = _"&&&&\2||\2"; {/* Another comment */ }
+logterm = ^^eqterm (_spc_ eqlop ^^eqterm)*;
 
-multop  = _spc_ "*\2/\2%\2" _spc_ ;
-multerm = ^^term (_bitop <^^term)*;
+eqlop   = _"==\2!=\2";
+eqterm  = ^^relterm (_spc_ relop ^^relterm)* {/*WTF!!*/} ;
 
-bitop   = _spc_ "&&\2|\2^\2" _spc_ ;
+relop   = _"<=\2<\2>=\2>\2";
+relterm = ^^addterm (_spc_ addop ^^addterm)*; 
 
-term = _assign
-     / _varref
+addop   = _"&[+-]" ;
+addterm = ^^multerm (_spc_ multop ^^multerm)*;
+
+multop  = (_"&[*/%]" / "<<" / ">>");
+multerm = ^^shiftterm (_spc_ shiftop ^^shiftterm)*;
+
+shiftop   = _spc_ _"<<\2>>\2" _spc_ ;
+shiftterm = _spc_ ^^bitterm (_spc_ bitop ^^bitterm)*;
+
+bitop   = _spc_ _"&[&|^]" _spc_ ;
+bitterm = _spc_ term;
+
+term = assign
+     / varref _spc_ incrop? 
+     / incrop _spc_ varref
      / number
-     / _"(&*s" ^^exprterm+ _"&*s)"
-     / "-&*s\3~&*s\3" <^^term
+     / _"(&*s" ^^expr+ _"&*s)"
+     / unaryop ^^term
      ;
 
-varref = "&I\5" ;
-assign = "&I\4" _"&*s=&!@=" _spc_ <^^expr;
+varref = _"&I" ;
+assign = assign_var _spc_ assign_op  _spc_ ^^expr;
+assign_var = _"&I";
+assign_op = _"&[&!^%*/+-]\1>>\1<<"? _"=";
 number = _"0&[xX]&X\7&F\6";
-spc_ = _"&*s";
+unaryop = _"&[*!~-]";
+incrop = _"++\1--";
+spc_ = _"&*s\1//&N";
 

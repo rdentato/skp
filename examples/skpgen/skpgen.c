@@ -12,9 +12,8 @@
 // string = '&?[_]' "&Q" ;
 // rulename = "&I" ;
 // spc = (&+s / '#&N')*
-skpdef(pippo)
 */
-// skpdef(pluto)
+
 // grammar = (_'&*s' ruledef)+  _'&*s&!.' ;
 skpdef(grammar) {
   skprule_(spc_);
@@ -52,7 +51,9 @@ skpdef(alt_or) {
 
 // seq = (_'&*s' match)+ ;
 skpdef(seq) {
-  skpmany{ skprule_(spc_); skprule_(match); }
+  skpmany{ skprule_(spc_); 
+           skprule(incode); skpor skprule_(match); 
+         }
 }
 
 // match =  match_term repeat? / '&[!&]\4' match / _'#' '&D';
@@ -64,7 +65,6 @@ skpdef(match) {
             astswapnoempty;
             astliftall;
           } 
-    skpor { skprule(code); }
     skpor { skpmatch("&[!&]\4"); skprule_(match); }
 }
  
@@ -116,10 +116,8 @@ skpdef(lu_func) { skpmatch_("&I") ;}
 skpdef(lu_case) { skpmatch_("&I\1&D"); }
 skpdef(alt_case) { skprule_(alt); }
 
-skpdef(code) {
-  skpmatch_("&@{");
-  skpmatch_("&B");
-}
+skpdef(code) {skpmatch_("&@{"); skpmatch_("&B"); }
+skpdef(incode) {skpmatch_("&@{"); skpmatch_("&B"); }
 
 skpdef(spc_) { skpany{ skpmatch_("&+s\1//&N"); } }
 skpdef(spc) { skpmany{ skpmatch_("&+s\1//&N"); } }
@@ -291,6 +289,9 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
 
       astifnodeis(code) {
         if (rules >0) { fprintf(src,"}\n\n"); indent = 0; rules = 0; }
+        fprintf(src,"%.*s",astcurlen-2,astcurfrom+1);
+      }
+      astifnodeis(incode) {
         fprintf(src,"%.*s",astcurlen-2,astcurfrom+1);
       }
     }
