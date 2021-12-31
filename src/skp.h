@@ -235,12 +235,27 @@ static int is_oneof(uint32_t ch, char *set, int iso)
 
 static int is_string(char *s, char *p, int len)
 {
+  char *start = s;
+  int mlen = 0;
+ _skptrace("STR: %d '%s' '%.*s'",len,s,len,p);
   while (len--) {
-    if (*s != *p) return 0;
-    if (*s == '\0') return 1;
-    s++; p++;
+    _skptrace("ALT: %d %s",len, p);
+    if (*p == '\xE') return mlen;
+    if (*s == *p) {
+      if (*s++ == '\0') return mlen;
+      mlen++;
+      p++;
+    }
+    else {
+      while (len>0 && *p++ != '\xE') len--; // search for an alternative
+      if (len <= 0) return 0;
+     _skptrace("ALT2: %d '%.*s'",len,len,p);
+      s = start;
+      mlen = 0;
+    }
   }
-  return 1;
+ _skptrace("MRET: %d",mlen);
+  return mlen;
 }
 
 static uint32_t get_close(uint32_t open)
@@ -341,9 +356,9 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
                  break;
 
       case '"' : case '\'': case '`': {
-                 int l = 0; uint32_t quote = pat[-1];
+                 int l = 0; int ml ; uint32_t quote = pat[-1];
                  while (pat[l] && pat[l] != quote) l++;
-                 if (l>0 && (is_string(s_end,pat,l) != match_not)) { s_end += l; ret = MATCHED; }
+                 if (l>0 && ((ml=is_string(s_end,pat,l)) > 0)) { s_end += ml; ret = MATCHED; }
                  else if (match_min == 0) ret = MATCHED;
                  pat += l+1;
                  break;  
