@@ -1,27 +1,31 @@
 // Expressions
 
 { 
-  //         Precedence ───┬╮
-  //        Right Assoc ──╮││
-  //                      ▼▼▼
-  #define TOK_LOGIC_OR  0x00101
-  #define TOK_LOGIC_AND 0x00201
-  #define TOK_BITW_OR   0x00301
-  #define TOK_BITW_XOR  0x00401
-  #define TOK_BITW_AND  0x00501
-  #define TOK_EQUAL     0x00601
-  #define TOK_NOTEQUAL  0x00602
-  #define TOK_LESSEQ    0x00701
-  #define TOK_LESS      0x00702
-  #define TOK_GREATEQ   0x00703 
-  #define TOK_GREAT     0x00704
-  #define TOK_SHIFLEFT  0x00801
-  #define TOK_SHIFRIGHT 0x00802
-  #define TOK_ADD       0x00901
-  #define TOK_SUBTRACT  0x00902
-  #define TOK_MULT      0x00A01
-  #define TOK_DIV       0x00A02
-  #define TOK_MOD       0x00A03
+  //         Precedence ──┬╮
+  //      Right Assoc     ││
+  //        (0x8000)      ││
+  //                      ▼▼
+  #define TOK_LOGIC_OR  0x0101
+  #define TOK_LOGIC_AND 0x0201
+  #define TOK_BITW_OR   0x0301
+  #define TOK_BITW_XOR  0x0401
+  #define TOK_BITW_AND  0x0501
+  #define TOK_EQUAL     0x0601
+  #define TOK_NOTEQUAL  0x0602
+  #define TOK_LESSEQ    0x0701
+  #define TOK_LESS      0x0702
+  #define TOK_GREATEQ   0x0703 
+  #define TOK_GREAT     0x0704
+  #define TOK_SHIFLEFT  0x0801
+  #define TOK_SHIFRIGHT 0x0802
+  #define TOK_ADD       0x0901
+  #define TOK_SUBTRACT  0x0902
+  #define TOK_MULT      0x0A01
+  #define TOK_DIV       0x0A02
+  #define TOK_MOD       0x0A03
+  #define TOK_POWER     0x8101
+
+  #define isrightassociative(x) (((x) & 0x8000) != 0)
 
   skpfunc(op) {
     int len = 0;
@@ -49,7 +53,9 @@
                  break;
       case '+' : len = 1; ret = TOK_ADD;      break;
       case '-' : len = 1; ret = TOK_SUBTRACT; break;
-      case '*' : len = 1; ret = TOK_MULT;     break;
+      case '*' : if (skpcur[1] == '*') { len = 2; ret = TOK_POWER;}
+                 else { len = 1; ret = TOK_MULT;}
+                 break;
       case '/' : len = 1; ret = TOK_DIV;      break;
       case '%' : len = 1; ret = TOK_MOD;      break;
     }
@@ -57,7 +63,7 @@
     skpcur = len>0? skpcur+len : NULL;
     return ret;
   }
-  
+
   void fixprec(ast_t astcur) // <-- use astcur to ensure continuity with parser
   {
     int32_t arg2;
@@ -73,9 +79,13 @@
     fprintf(stderr,"\n");
 
     int getnext = 0;
+    int32_t prec1, prec2;
     while (1) {
       getnext = 1;
-      if ((astnodeinfo(astcur,op1) & 0xFF00) < (astnodeinfo(astcur,op2) & 0xFF00)) {
+      prec1 = (astnodeinfo(astcur,op1) & 0xFF00);
+      prec2 = (astnodeinfo(astcur,op2) & 0xFF00);
+      if ( (prec1 < prec2)
+         || ((prec1 == prec2) && isrightassociative(prec1))) {
         astlower(astcur, term, arg1, arg2);
         op2 = astright(astcur, arg1);
         if (op2 != ASTNULL) {
