@@ -1,5 +1,5 @@
 
 samban:
-	cd examples/samban; make
+	cd examples/skpgen; make
 
 	
