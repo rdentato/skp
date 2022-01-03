@@ -1,46 +1,126 @@
 // Expressions
 
-{ /* this is a comment */ }
+{ 
+  //         Precedence ───┬╮
+  //        Right Assoc ──╮││
+  //                      ▼▼▼
+  #define TOK_LOGIC_OR  0x00101
+  #define TOK_LOGIC_AND 0x00201
+  #define TOK_BITW_OR   0x00301
+  #define TOK_BITW_XOR  0x00401
+  #define TOK_BITW_AND  0x00501
+  #define TOK_EQUAL     0x00601
+  #define TOK_NOTEQUAL  0x00602
+  #define TOK_LESSEQ    0x00701
+  #define TOK_LESS      0x00702
+  #define TOK_GREATEQ   0x00703 
+  #define TOK_GREAT     0x00704
+  #define TOK_SHIFLEFT  0x00801
+  #define TOK_SHIFRIGHT 0x00802
+  #define TOK_ADD       0x00901
+  #define TOK_SUBTRACT  0x00902
+  #define TOK_MULT      0x00A01
+  #define TOK_DIV       0x00A02
+  #define TOK_MOD       0x00A03
+
+  skpfunc(op) {
+    int len = 0;
+    int32_t ret = 0;
+    switch (*skpcur) {
+      case '|' : if (skpcur[1] == '|') { len = 2; ret = TOK_LOGIC_OR;}
+                 else { len = 1; ret = TOK_BITW_OR;}
+                 break;
+      case '&' : if (skpcur[1] == '&') { len = 2; ret = TOK_LOGIC_AND;}
+                 else { len = 1; ret = TOK_BITW_AND;}
+                 break;
+      case '^' : len = 1; ret = TOK_BITW_XOR;
+                 break;
+      case '=' : if (skpcur[1] == '=') { len = 2; ret = TOK_EQUAL;}
+                 break;
+      case '!' : if (skpcur[1] == '=') { len = 2; ret = TOK_NOTEQUAL;}
+                 break;
+      case '<' : if (skpcur[1] == '=') { len = 2; ret = TOK_LESSEQ;}
+                 else if (skpcur[1] == '<') { len = 2; ret = TOK_SHIFLEFT;}
+                 else { len = 1; ret = TOK_LESS;}
+                 break;
+      case '>' : if (skpcur[1] == '=') { len = 2; ret = TOK_GREATEQ;}
+                 else if (skpcur[1] == '>') { len = 2; ret = TOK_SHIFRIGHT;}
+                 else { len = 1; ret = TOK_GREAT;}
+                 break;
+      case '+' : len = 1; ret = TOK_ADD;      break;
+      case '-' : len = 1; ret = TOK_SUBTRACT; break;
+      case '*' : len = 1; ret = TOK_MULT;     break;
+      case '/' : len = 1; ret = TOK_DIV;      break;
+      case '%' : len = 1; ret = TOK_MOD;      break;
+    }
+
+    skpcur = len>0? skpcur+len : NULL;
+    return ret;
+  }
+  
+  void fixprec(ast_t astcur) // <-- use astcur to ensure continuity with parser
+  {
+    int32_t arg2;
+    int32_t op2; 
+    int32_t arg1;
+    int32_t op1;
+
+    if (ASTNULL == (arg2 = astlastnode))          return;
+    if (ASTNULL == (op2  = astleft(astcur,arg2))) return;
+    if (ASTNULL == (arg1 = astleft(astcur,op2)))  return;
+    if (ASTNULL == (op1  = astleft(astcur,arg1))) return;
+    astprint(astcur,stderr);
+    fprintf(stderr,"\n");
+
+    int getnext = 0;
+    while (1) {
+      getnext = 1;
+      if ((astnodeinfo(astcur,op1) & 0xFF00) < (astnodeinfo(astcur,op2) & 0xFF00)) {
+        astlower(astcur, term, arg1, arg2);
+        op2 = astright(astcur, arg1);
+        if (op2 != ASTNULL) {
+          arg2 = astright(astcur,op2);
+          getnext = 0;
+        }
+      }
+      if (getnext) {
+        arg2 = arg1;
+        op2  = op1;
+        if (ASTNULL == (arg1 = astleft(astcur,op2)))  return;
+        if (ASTNULL == (op1  = astleft(astcur,arg1))) return;
+      }
+    }
+  }
+}
 
 expr = ^^exprterm;
 
-exprterm = ^^logterm (_spc_ logop ^^logterm)*;
+exprterm = _term ( _spc_ op[] _term )* { fixprec(astcur); } ;
 
-logop   = _"&&&&\2||\2"; {/* Another comment */ }
-logterm = ^^eqterm (_spc_ eqlop ^^eqterm)*;
+term = _spc_  ( assign
+              / varref 
+              / number
+              / _"(&*s" expr _"&*s)"
+              / unopterm
+              );
 
-eqlop   = _"==\2!=\2";
-eqterm  = ^^relterm (_spc_ relop ^^relterm)* {/*WTF!!*/} ;
+unopterm = _"+\1-\2!\3" #? ^^term;
 
-relop   = _"<=\2<\2>=\2>\2";
-relterm = ^^addterm (_spc_ addop ^^addterm)*; 
+varref = #16 _"++\2--\3" #? lvalue
+       / lvalue _spc_ (_"++\4--\5" #? )?
+       ;
 
-addop   = _"&[+-]" ;
-addterm = ^^multerm (_spc_ multop ^^multerm)*;
+lvalue = _spc_ "&I" varindex? ;
 
-multop  = (_"&[*/%]" / "<<" / ">>");
-multerm = ^^shiftterm (_spc_ shiftop ^^shiftterm)*;
+varindex = _"&*s[&*s" ^^array_index _"&*s]" #?20 /
+           _"." lvalue #?30 / _"&*s->&*s" lvalue #?40;
 
-shiftop   = _spc_ _"<<\2>>\2" _spc_ ;
-shiftterm = _spc_ ^^bitterm (_spc_ bitop ^^bitterm)*;
-
-bitop   = _spc_ _"&[&|^]" _spc_ ;
-bitterm = _spc_ term;
-
-term = assign
-     / varref _spc_ incrop? 
-     / incrop _spc_ varref
-     / number
-     / _"(&*s" ^^expr+ _"&*s)"
-     / unaryop ^^term
-     ;
-
-varref = _"&I" ;
-assign = assign_var _spc_ assign_op  _spc_ ^^expr;
-assign_var = _"&I";
+array_index = ^^exprterm;
+assign = varref _spc_ assign_op  _spc_ ^^expr;
 assign_op = _"&[&!^%*/+-]\1>>\1<<"? _"=";
-number = _"0&[xX]&X\7&F\6";
+
+number = _"0&[xX]&X\7" #?/ _"&F\6" #?;
+
 unaryop = _"&[*!~-]";
-incrop = _"++\1--";
 spc_ = _"&*s\1//&N";
 
