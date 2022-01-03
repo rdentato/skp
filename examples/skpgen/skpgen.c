@@ -52,8 +52,16 @@ skpdef(alt_or) {
 // seq = (_'&*s' match)+ ;
 skpdef(seq) {
   skpmany{ skprule_(spc_); 
-           skprule(incode); skpor skprule_(match); 
+                 skprule(incode);
+           skpor { skpmatch_("#"); skprule(retval); }
+           skpor { skpmatch("&[!&]\4"); skprule_(match); }
+           skpor skprule_(match); 
          }
+}
+
+skpdef(retval) {
+  skpmatch_("&?'?'");
+  skpmaybe skpmatch_("&D");
 }
 
 // match =  match_term repeat? / '&[!&]\4' match / _'#' '&D';
@@ -65,7 +73,6 @@ skpdef(match) {
             astswapnoempty;
             astliftall;
           } 
-    skpor { skpmatch("&[!&]\4"); skprule_(match); }
 }
  
 skpdef(repeat) { skpmatch_("&?[+*?]"); }
@@ -261,6 +268,21 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
         indent +=4;
       }
       
+      astifnodeis(retval) {
+        char *s=astcurfrom;
+        if (*astcurfrom == '?') {
+          fprintf(src,"%*sif (!astfailed) {\n",indent,skpemptystr);
+          s++; indent+=2;
+        }
+        fprintf(src,"%*sastretval(",indent,skpemptystr);
+        if (astcurto>s) fprintf(src,"%d);\n",atoi(s));
+        else fprintf(src,"astlastinfo);\n");
+        if (*astcurfrom == '?') {
+          indent-=2;
+          fprintf(src,"%*s}\n",indent,skpemptystr);
+        }
+      }
+
       astifnodeis(alt) {
         rpt = 0;
         if (repeat) { prtrepeat(repeat, indent, src); rpt++;}
@@ -289,10 +311,18 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
 
       astifnodeis(code) {
         if (rules >0) { fprintf(src,"}\n\n"); indent = 0; rules = 0; }
-        fprintf(src,"%.*s",astcurlen-2,astcurfrom+1);
+        char *start = astcurfrom+1; int len = astcurlen-2;
+        if (*start == '?') {
+          fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
+        }
+        else fprintf(src,"%.*s",len,start);
       }
       astifnodeis(incode) {
-        fprintf(src,"%.*s",astcurlen-2,astcurfrom+1);
+        char *start = astcurfrom+1; int len = astcurlen-2;
+        if (*start == '?') {
+          fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
+        }
+        else fprintf(src,"%.*s",len,start);
       }
     }
     astifexit {
@@ -389,6 +419,7 @@ int main(int argc, char *argv[])
     snprintf(fnamebuf,MAXFNAME,"%s.c",argv[1]);
     src = fopen(fnamebuf,"w");
     if (src) {
+      fprintf(src,"#line 1 \"%s.skp\"\n",argv[1]);
       snprintf(fnamebuf,MAXFNAME,"%s.h",argv[1]);
       hdr = fopen(fnamebuf,"w");
       if (hdr) {
