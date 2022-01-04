@@ -286,7 +286,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
       astifnodeis(alt) {
         rpt = 1;
         if (repeat) { prtrepeat(repeat, indent, src); }
-        else fprintf(src,"%*sif (!astfailed) {\n",indent, skpemptystr);
+        else fprintf(src,"%*sskpgroup {\n",indent,skpemptystr);
         indent += 2*rpt;
         push(rpt);
         repeat = '\0';

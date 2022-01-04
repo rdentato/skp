@@ -1,4 +1,4 @@
-// Expressions
+%% Expressions
 
 { 
   //         Precedence ──┬╮
@@ -103,11 +103,9 @@
   }
 }
 
-expr = ^^exprterm;
+expr =  _term ( _spc_ op[] _term  )* {?fixprec(astcur); } ;
 
-exprterm = _term ( _spc_ op[] _term )* { fixprec(astcur); } ;
-
-term = _spc_  ( assign
+term = _spc_  ( assign #4
               / varref 
               / number
               / _"(&*s" expr _"&*s)"
@@ -125,12 +123,13 @@ lvalue = _spc_ "&I" varindex? ;
 varindex = _"&*s[&*s" ^^array_index _"&*s]" #?20 /
            _"." lvalue #?30 / _"&*s->&*s" lvalue #?40;
 
-array_index = ^^exprterm;
+array_index = ^^expr;
+
 assign = varref _spc_ assign_op  _spc_ ^^expr;
-assign_op = _"&[&!^%*/+-]\1>>\1<<"? _"=";
+assign_op = #2 (_"&[&!^%*/+-]\1>>\1<<" #?)? _"=" ;
 
 number = _"0&[xX]&X\7" #?/ _"&F\6" #?;
 
 unaryop = _"&[*!~-]";
-spc_ = _"&*s\1//&N";
+spc_ = _"&*s\1%%&N";
 
