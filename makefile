@@ -1,5 +1,5 @@
 
-samban:
+skpgen:
 	cd examples/skpgen; make
 
 	
