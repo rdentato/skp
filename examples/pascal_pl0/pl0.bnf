@@ -1,0 +1,20 @@
+program = block '.' .
+  block =  { declaration } statement .
+    declaration = constant | variable | function .
+      constant = CONST constant_definition { ',' constant_definition } ';' .
+        constant_definition = NAME '=' NUMBER .
+      variable = VAR NAME { ',' NAME } ';' .
+      function = FUNCTION NAME '(' [ NAME { ',' NAME } ]  ')' block ';' .
+        expression = [ ( '-' | '+' ) ] term { ( '-' | '+' ) term } .
+          term = factor { ( '*' | '/' ) factor } .
+            factor = NAME '(' [ expression { ',' expression } ] ')'
+             | NUMBER | NAME | '(' expression ')' .
+        statement = [ NAME ':=' expression
+             | BEGIN statement { ';' statement } END
+             | IF condition THEN statement
+             | WHILE condition DO statement
+             | RETURN expression
+             | WRITE expression ] .
+          condition = ODD expression
+             | expression ( '=' | '<>' | '<' | '<=' | '>' | '>=' ) expression .
+             

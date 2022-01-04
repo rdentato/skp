@@ -1,0 +1,102 @@
+%% SKP grammar for PL0 as described on:
+%% http://www.felix-colibri.com/papers/compilers/pl0_grammar/pl0_grammar.html
+%%
+%%  The __ rule is for 0 or more spaces
+
+program = block _DOT _EOF ;
+
+block = declarations statement ;
+
+%% Modified the bnf to make it similar to what Pascal prescribes
+declarations = const* vardef* fndef* ;
+
+const      = _CONST const_def ( _COMMA  const_def )* _SEMICOLON ;
+const_def  = __ const_name _EQUAL const_val ;
+const_name = _NAME ;
+const_val  = _NUMBER;
+
+vardef = _VAR __ vardef_name ( _COMMA vardef_name )* _SEMICOLON ;
+vardef_name  = _NAME ;
+
+fndef = _FUNCTION __ fndef_name _OPENPAR ( __ fndef_arg (_COMMA fndef_arg )*)? _CLOSEPAR
+                          block? _SEMICOLON ;
+fndef_name = _NAME ;
+fndef_arg  = _NAME ;
+
+expr   = sign? __ term ( __ add_op __ term )* ;
+term   = factor ( __ mult_op __ factor )* ;
+
+factor = fncall
+       / value
+       / idref                   %% <-- Can be a variable or a const
+       / _OPENPAR expr _CLOSEPAR
+       ;
+
+idref  = _NAME ;
+value  = _NUMBER ;
+
+fncall = fncall_name _OPENPAR ( fncall_arg (_COMMA fncall_arg )* )? _CLOSEPAR;
+fncall_name = _NAME ;
+fncall_arg  = expr ;
+
+sign    = _"+\2-\3" ;
+add_op  = _"+\2-\3" ;
+mult_op = _"*\4/\6" ;
+
+statement = compound_stmt / simple_stmt ;
+
+compound_stmt = 
+           _BEGIN statement? (_SEMICOLON statement )* _END ;
+
+simple_stmt = 
+            write_stmt
+          / read_stmt     %% Not in the original bnf!
+          / if_stmt
+          / while_stmt
+          / return_stmt
+          / assignment
+          ;
+
+if_stmt     = _IF condition _THEN __ statement ;
+while_stmt  = _WHILE condition _DO __ statement ;
+return_stmt = _RETURN expr ;
+write_stmt  = _WRITE __ ( STRING / expr) ;   %% STRING Not in the original bnf!
+read_stmt   = _READ __ readvar;
+
+readvar = _NAME ;
+
+assignment = __ assign_var _ASSIGN expr;
+assign_var = _NAME ;
+
+condition = ODD expr / expr __ CMP expr ;
+
+
+ASSIGN    = _"&*s:=&*s" ;
+COMMA     = _"&*s,&*s" ;
+CLOSEPAR  = _"&*s)&*s" ;
+DOT       = _"&*s.&*s" ;
+EOF       = _"&*s&!." ;
+EQUAL     = _"&*s=&*s" ;
+NAME      = _"&I" ;
+NUMBER    = _"&D" ;
+OPENPAR   = _"&*s(&*s" ;
+SEMICOLON = _"&*s;&*s" ;
+STRING    = _"&Q" ;
+_         = _"&*s" ;
+
+CMP = _"=\1<>\2<=\3<\4>=\5>\6" ;
+
+BEGIN     = __ _"&!Cbegin&!@a" ;
+CONST     = __ _"&!Cconst&!@a" ;
+DO        = __ _"&!Cdo&!@a" ;
+END       = __ _"&!Cend&!@a" ;
+FUNCTION  = __ _"&!Cfunction&!@a" ;
+IF        = __ _"&!Cif&!@a" ;
+ODD       = __ _"&!Codd&!@a" ;
+READ      = __ _"&!Cread&!@a" ;
+RETURN    = __ _"&!Creturn&!@a" ;
+THEN      = __ _"&!Cthen&!@a" ;
+VAR       = __ _"&!Cvar&!@a" ;
+WHILE     = __ _"&!Cwhile&!@a" ;
+WRITE     = __ _"&!Cwrite&!@a" ;
+
