@@ -126,8 +126,8 @@ skpdef(alt_case) { skprule_(alt); }
 skpdef(code) {skpmatch_("&@{"); skpmatch_("&B"); }
 skpdef(incode) {skpmatch_("&@{"); skpmatch_("&B"); }
 
-skpdef(spc_) { skpany{ skpmatch_("&+s\1//&N"); } }
-skpdef(spc) { skpmany{ skpmatch_("&+s\1//&N"); } }
+skpdef(spc_) { skpany{ skpmatch_("&+s\1%%&N"); } }
+skpdef(spc) { skpmany{ skpmatch_("&+s\1%%&N"); } }
 
 /************************************/
 
@@ -284,8 +284,9 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
       }
 
       astifnodeis(alt) {
-        rpt = 0;
-        if (repeat) { prtrepeat(repeat, indent, src); rpt++;}
+        rpt = 1;
+        if (repeat) { prtrepeat(repeat, indent, src); }
+        else fprintf(src,"%*sif (!astfailed) {\n",indent, skpemptystr);
         indent += 2*rpt;
         push(rpt);
         repeat = '\0';
