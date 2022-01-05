@@ -1,13 +1,15 @@
-CONST A = 8, B=2 ;
-VAR X,Y ;
-  function f(z,w) begin
-    return b+z*w 
-  end ;
+program test5
+VAR X,Y,T;
+FUNCTION F()
+BEGIN
+  write 'Hello world! (';
+  write x;
+  write '-';
+  write y;
+  write ')\n'
+END;
 begin 
-  X := A ;
-  Y := 8 ; 
-  if X < 42 THEN  BEGIN 
-     Y := X + B ;
-     X := F(3,Y+3*A)
-  END
+  X := 10 ;
+  Y := 1 ;
+  f()
 END.
