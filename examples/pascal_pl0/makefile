@@ -19,8 +19,8 @@ all:
 	@cd ../skpgen; make skpgen
 	make pl0
 
-pl0: pl0.o pl0_main.o
-	$(CC) -o $@ pl0.o pl0_main.o $(LNFLAGS) 
+pl0: pl0.o pl0_main.o pl0_genc.o
+	$(CC) -o $@ pl0.o pl0_main.o pl0_genc.o $(LNFLAGS) 
 
 pl0_main.o: pl0_main.c
 	$(CC) -c $(CFLAGS) -DSKP_MAIN $<

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "pl0.h"
 
+void generate(ast_t ast, FILE *src);
 
 #define trace(...) (fprintf(stderr,__VA_ARGS__),fputc('\n',stderr))
 /************************************/
@@ -53,14 +54,23 @@ int main(int argc, char *argv[])
   FILE *src=NULL;
   FILE *hdr=NULL;
   char *s;
+  int trc =0;
   
   if (argc<2) usage();
 
-  pasbuf = loadsource(argv[1]);
+  s = argv[1];
+
+  if (*s == '-' && s[1]=='t') {
+    trc = 1;
+    if (argc<3) usage();
+    s = argv[2];
+  }
+
+  pasbuf = loadsource(s);
 
   if (!pasbuf) usage();
 
-  ast = skpparse(pasbuf,program,0);
+  ast = skpparse(pasbuf,program,trc);
 
   if (asthaserr(ast)) {
     trace("In rule: '%s'",asterrrule(ast));
@@ -85,13 +95,23 @@ int main(int argc, char *argv[])
     hdr = fopen(fnamebuf,"w");
     if (hdr) {
       astprint(ast,hdr);
+      fclose(hdr); hdr = NULL;
+    }
+
+    sprintf(fnamebuf,"%s"".c",bnamebuf);
+    src = fopen(fnamebuf,"w");
+    if (src) {
+      generate(ast,src);
+      fclose(src); src = NULL;
+    }
+    else {
+      fprintf(stderr,"Unable to write on %s\n",fnamebuf);
     }
   }
 
   if (src) fclose(src);
-  if (hdr) {
-    fclose(hdr);
-  }
+  if (hdr) fclose(hdr);
+   
   if (pasbuf) free(pasbuf);
   if (ast) astfree(ast);
 }
