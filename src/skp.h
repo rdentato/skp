@@ -1034,6 +1034,7 @@ int astisnodeexit(ast_t ast, int32_t ndx);
 #define astcurfrom astnodefrom(astcur,astcurnode)
 #define astcurto   astnodeto(astcur,astcurnode)
 #define astcurlen  astnodelen(astcur, astcurnode)
+#define astcurnodeinfo astnodeinfo(astcur,astcurnode)
 
 static inline ast_t ast_cur_init(ast_t ast)
 { 
