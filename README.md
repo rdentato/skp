@@ -51,7 +51,39 @@ the `to` variables will point right after the skipped text. For example:
 
 ### Patterns
 
-Special match patterns are introduced by the `&` character.
+A *patterns* is a sequence of *recognizers* possibly separated by spaces.
+
+Each recognizer has three parts:
+
+```  
+     *!u
+     ^^^
+     |||
+     \\\___ Recognizer operation
+      \\___ Negate (optional)
+       \___ Repeat (optopnal)
+
+Note that not all modifiers are meaningful for all operation
+```
+
+Here is some example, the full list is below.
+```
+    "d"            a single decimal digit
+    "dd"           two digits
+    "+d"           one or more digits
+    "?d"           an optional digit
+    "dl"           a digit follwed by a lower case ASCII letter
+    "d l"          a digit follwed by a lower case ASCII letter
+                   (spaces are meaningless)
+    "d S 'cm'"     a digit followed by optional spaces and the string "`cm`"
+    "d S ?'cm'"    a digit followed by optional spaces and an optional string "`cm`"
+    "d@ S 'cm'"    a digit followed by optional spaces and the string "`cm`"
+                   but will match only the digit! (`@` is a *positive lookahead*)
+    "d!@ S 'cm'"   a digit *not* followed optional spaces and the string "`cm`"
+                   will match only the digit! (`!@` is a *negative lookahead*)
+    "`'` I `'`"    An identifier between single quotes (backticks are used to 
+                   avoid clashes with the quote.)
+```
 
 ```
    a  ASCII alphabetic char
@@ -62,21 +94,26 @@ Special match patterns are introduced by the `&` character.
    w  white space (includes some Unicode spaces)
    s  white space and vertical spaces (e.g. LF)
    c  control
-   n  newline
-
+   n  newline (can be '\r', '\n' or '\r\n')
    
-   ' " or ` a literal string (useful for optional and negatives)
+   '
+   "
+   `  A literal string (useful for optional and negatives)
+      Multiple strings can be separated by '\xE'
+
    Q  Quoted string with '\' as escape
    B  Balanced sequence of parenthesis (can be '()''[]''{}')
    () Balanced parenthesis (only '()')
    I  Identifier ([_A-Za-z][_0-9A-Za-z]*)
    N  Up to the end of line
-   D  integer decimal number (possibly signed)
-   F  floating point number (possibly with sign and exponent)
-   X  hex number (possibly with leading 0x)
+   D  Integer decimal number (possibly signed)
+   F  Decimal number (possibly with sign and exponent)
+   X  Hex number (possibly with leading 0x)
+   S  Zero or more spaces
+   W  Zero or more blanks
 
-   C  case sensitive (ASCII) comparison
-   U  utf-8 encoding (or ASCII/ISO-8859)
+   C  Case sensitive (ASCII) comparison
+   U  UTF-8 encoding (or ASCII/ISO-8859)
 
    *  zero or more match
    ?  zero or one match
@@ -94,29 +131,27 @@ Special match patterns are introduced by the `&` character.
 
    >  skip to the start of pattern (skip to)
 
-   & the character '&'
-
-   \1 ... \7  alternatives
+   \1 ... \7  alternative patterns
+   \xE        alternative strings separator
 ```
 
 Examples:
 
 ```
-   skp(cur,"&*s",&cur); // skip spaces (if any)
-   skp(start,"|&*![|]|",&end); // skip text enclosed in '|'
-   skp(text,"&!Cfoo",&to); // skips "foo", "FoO", "fOo", etc.
+   skp(cur,"S",&cur); // skip spaces (if any)
+   skp(start,"'|' *!'|' '|'",&end); // skip text enclosed in '|'
+   skp(text,"!C 'foo'",&to); // skips "foo", "FoO", "fOo", etc.
 
-   alt = skp(text,"&D\1&I\2"); // returns 1 if it's an integer number
-                               //         2 if it's an identifier
-                               //         0 None of the above
+   alt = skp(text,"D\1I\2"); // returns 1 if it's an integer number
+                             //         2 if it's an identifier
+                             //         0 None of the above
 ```
-
 
 ### Skip to
 Sometimes you want to skip ahead until you match a specified pattern:
 
 ```
-   skp(text,"&>&D",&num); // Set num to the the beginning of next number
+   skp(text,">D",&num); // Set num to the the beginning of next number
 ```
 
 To avoid calling `skp` againg you can use another form of the function:
@@ -130,7 +165,7 @@ For example:
    char *text="a b c 123 d e";
    char *start, *end;
 
-   skp(text,"&>&D",&start,&end);
+   skp(text,">D",&start,&end);
    // a b c 123 d e
    //       ^  ^____ end
    //       |_______ start
@@ -148,6 +183,7 @@ There is a form of the skp function that does this:
 ```
 
 Within the code guarded by skp
+
 ```
     skpif(char *pattern) { ... }  execute the code block if text match the pattern
     skpelse { } execute the code if nothing matches
@@ -161,11 +197,11 @@ You can think of it as loop that will go through the text until all
 the text has been scanned or no match is found. For example:
 ```
    skp(csv) {
-     skpif(",&*s") { num_col++; }
-     skpif("&D")   { store_number(skpfrom, skpto, num_row, num_col);}
-     skpif("&Q")   { store_string(skpfrom, skpto, num_row, num_col);}
-     skpif("&n")   { num_row++; num_col = 0; }
-     skpif("&+s")  { }
+     skpif("','S") { num_col++; }
+     skpif("D")   { store_number(skpfrom, skpto, num_row, num_col);}
+     skpif("Q")   { store_string(skpfrom, skpto, num_row, num_col);}
+     skpif("n")   { num_row++; num_col = 0; }
+     skpif("+s")  { }
      skpelse       { prterror("Unexpected text at %d,%d\n",num_row, num_col); 
                      break;
                    }
@@ -205,7 +241,7 @@ This can be represented in skp with a recursive descent parser as follows:
     }
     skpor {
       skprule(term);
-      skpmatch("+\1-\2");
+      skpmatch("'+'\1'-'\2");
       skprule(term);
     }
   }
@@ -215,12 +251,12 @@ This can be represented in skp with a recursive descent parser as follows:
       skpmatch("&D");
     }
     skpor {
-      skpstring("(");
+      skpstring("'('");
       skprule(expr);
-      skpstring(")");
+      skpstring("')'");
     }
     skpor {
-      skpstring("-");
+      skpstring("'-'");
       skprule(term);
     }
   }
