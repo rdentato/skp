@@ -1,5 +1,3 @@
-
-
 #define SKP_MAIN
 #include "skp.h"
 
@@ -14,7 +12,7 @@ opmult = '*'|'/'|'%'
 
 skpdef(eval) {
   skprule(expr);
-  skpmatch_("&*s&!."); // Ensure all input is consumed
+  skpmatch_("S!."); // Ensure all input is consumed
 }
 
 skpdef(expr) {
@@ -36,24 +34,24 @@ skpdef(term) {
 }
 
 skpdef(fact) {
-  skpmatch_("&*s");
-  skponce { skpmatch("&D\2"); }
+  skpmatch_("S");
+  skponce { skpmatch("D\2"); }
     skpor { skpstring("-",6); skprule(fact);  astswap; }
     skpor {
-      skpmatch_("(&*s");
+      skpmatch_("'('S");
       skprule(expr);  //astlift;
-      skpmatch_("&*s)");
+      skpmatch_("S')'");
     }
 }
 
 skpdef(op_add) {
-  skpmatch_("&*s");
-  skpmatch("+\1-");
+  skpmatch_("S");
+  skpmatch("'+'\1'-'");
 }
 
 skpdef(op_mult) {
-  skpmatch_("&*s");
-  skpmatch("*\1/");
+  skpmatch_("S");
+  skpmatch("'*'\1'/'");
 }
 
 #define STK_MAX 100
