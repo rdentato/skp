@@ -70,7 +70,16 @@ extern volatile int skp_zero;
 // Borrowed from dbg.h but renamed to minimize namespace pollution.
 #define _skptrace(...)
 #define  skptrace(...) (fprintf(stderr,"TRCE: " __VA_ARGS__), \
-                         fprintf(stderr," \xF%s:%d\n",__FILE__,__LINE__))
+                        fprintf(stderr," \xF%s:%d\n",__FILE__,__LINE__))
+
+#define _skptest(e_,...) 
+#define  skptest(e_,...) \
+  do { \
+    int tst_=!(e_); \
+    fprintf(stderr,"%s: (%s) \xF%s:%d\n","PASS\0FAIL"+tst_*5, #e_ ,__FILE__,__LINE__); \
+    if (tst_) { fprintf(stderr,"    : " __VA_ARGS__); fputc('\n',stderr); } \
+    errno = tst_; \
+  } while(0)
 
 #ifdef SKP_MAIN
 
@@ -145,7 +154,7 @@ static uint32_t skp_next(char *s,char **end,int iso)
 
 static int chr_cmp(uint32_t a, uint32_t b, int fold)
 { _skptrace("CMP: %d %c %c",fold, a,b);
-  if (fold && a <= 0xFF && b <= 0xFF) {
+  if (fold && a <= 0x7F && b <= 0x7F) {
     a = tolower(a);
     b = tolower(b);
   }
@@ -233,25 +242,32 @@ static int is_oneof(uint32_t ch, char *set, int iso)
   return 0;
 }
 
-static int is_string(char *s, char *p, int len)
+static int is_string(char *s, char *p, int len, int flg)
 {
   char *start = s;
+  uint32_t p_chr,s_chr;
+  char *p_end, *s_end;
   int mlen = 0;
  _skptrace("STR: %d '%s' '%.*s'",len,s,len,p);
-  while (len--) {
-    _skptrace("ALT: %d %s",len, p);
+  while (len) {
+   _skptrace("ALT: %d '%s' '%s'",len, p,s);
     if (*p == '\xE') return mlen;
-    if (*s == *p) {
-      if (*s++ == '\0') return mlen;
-      mlen++;
-      p++;
+
+    p_chr = skp_next(p,&p_end,flg & 2);
+    s_chr = skp_next(s,&s_end,flg & 2);
+
+    if (chr_cmp(s_chr,p_chr,flg & 1)) {
+      mlen += (int)(s_end - s);
+      len  -= (int)(p_end - p);
+      //if (*s_end == '\0') return mlen;
+      p = p_end;  s = s_end;
     }
     else {
       while (len>0 && *p++ != '\xE') len--; // search for an alternative
-      if (len <= 0) return 0;
-     _skptrace("ALT2: %d '%.*s'",len,len,p);
+      if (len-- <= 0) return 0;
       s = start;
       mlen = 0;
+     _skptrace("ALT2: %d p:'%.*s' s:'%s'",len,len,p,s);
     }
   }
  _skptrace("MRET: %d",mlen);
@@ -286,9 +302,9 @@ static uint32_t get_qclose(uint32_t open)
 
 static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
 {
-  uint32_t p_chr, s_chr;
+  uint32_t s_chr;
   char *p_end, *s_end;
-  int ret = 0;
+  int ret = MATCHED_FAIL;
   uint32_t match_min = 1;
   uint32_t match_max = 1;
   uint32_t match_cnt = 0;
@@ -299,8 +315,7 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
   s_end = src;
   s_chr = skp_next(s_end, &s_tmp,*flg & 2);
 
-  if (*pat == '&') {
-    pat++;
+    while (is_space(*pat)) pat++;
     
     if (*pat == '*') { match_min = 0;  match_max = UINT32_MAX; pat++; } 
     else if (*pat == '+') { match_max = UINT32_MAX; pat++; } 
@@ -326,11 +341,6 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
     intnumber = false;
     
     switch (*pat++) {
-      case '&' : if (s_chr == '&') {
-                   ret = MATCHED;
-                   get_next_s_chr();
-                 };
-                 break;
 
       case '.' : if (match_not) ret = (s_chr == 0);
                  else W(s_chr != 0);
@@ -358,8 +368,13 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
       case '"' : case '\'': case '`': {
                  int l = 0; int ml ; uint32_t quote = pat[-1];
                  while (pat[l] && pat[l] != quote) l++;
-                 if (l>0 && ((ml=is_string(s_end,pat,l)) > 0)) { s_end += ml; ret = MATCHED; }
-                 else if (match_min == 0) ret = MATCHED;
+                 if (l>0 && ((ml=is_string(s_end,pat,l,*flg)) > 0)) {
+                   if (!match_not) {
+                     s_end += ml;
+                     ret = MATCHED;
+                   }
+                 }
+                 else if (match_min == 0 || match_not) ret = MATCHED;
                  pat += l+1;
                  break;  
                }
@@ -370,6 +385,14 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
                  break;
 
       case 'U' : *flg = (*flg & ~2) | (match_not * 2); ret = MATCHED;
+                 break;
+
+      case 'S' : while (is_space(s_chr)) get_next_s_chr();;
+                 ret = MATCHED;
+                 break;
+
+      case 'W' : while (is_blank(s_chr)) get_next_s_chr();;
+                 ret = MATCHED;
                  break;
 
       case 'N' : // Up to end of line
@@ -452,7 +475,7 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
                 intnumber = true;
 
       case 'F' : // Floating point number
-                 if (s_chr == '+' || s_chr == '-') {
+                 if (s_chr == '+' || s_chr == '-') { // sign
                    do {
                      get_next_s_chr();
                    } while (is_space(s_chr));
@@ -487,12 +510,6 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
       default  : ret = MATCHED_FAIL; pat--; break;
     }
     p_end = pat;
-  }
-  else {
-    p_chr = skp_next(pat,&p_end,*flg & 2);
-    s_end = s_tmp;
-    ret = chr_cmp(s_chr,p_chr,*flg & 1); 
-  }
 
   if (ret != MATCHED_FAIL) {
     if (pat_end) *pat_end = p_end;
@@ -517,9 +534,9 @@ int skp_(char *src, char *pat, char **to,char **end)
 
  _skptrace("SKP_: src:'%s' pat:'%s'",src,pat);
 
-  if ((pat[0] == '&') && (pat[1] == '>')) {
+  if (*pat == '>') {
     skp_to = 1;
-    pat   += 2;
+    pat++ ;
   }
  _skptrace("SKP_: src:'%s' pat:'%s' skp_to:%d",src,pat,skp_to);
 
@@ -746,7 +763,7 @@ void skp__abort(ast_t ast, char *msg,char *rule);
         ast_close(astcur,astcur->pos,par); \
         astcur->nodes[astcur->par[par]].aux = n; \
       } \
-      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", "MATCH\0FAILD"+(!!astfailed)*6, "^^^",astcur->pos); \
+      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", skp_matchfailed+(!!astfailed)*6, "^^^",astcur->pos); \
     } else (void)0
 
 #define skp_match_(how) \
@@ -755,7 +772,7 @@ void skp__abort(ast_t ast, char *msg,char *rule);
       how;\
       if (n==0) { astfailed = 1;} \
       else { astcur->lastinfo = n; astcur->pos += len;} \
-      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", "MATCH\0FAILD"+(!!astfailed)*6, "^^^",astcur->pos); \
+      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", skp_matchfailed+(!!astfailed)*6, "^^^",astcur->pos); \
     } else (void)0
 
 #define skp_how_match(pat) \
@@ -854,7 +871,7 @@ typedef struct {
         } else {astcur->lastinfo = ast_ret;}\
         skp_memoize(astcur, skp_M_ ## rule ,skp_N_ ## rule, sav.pos, sav.par_cnt); \
       } \
-      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", "MATCH\0FAILD"+(!!astfailed)*6, skp_N_ ## rule,astcur->pos); \
+      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", skp_matchfailed+(!!astfailed)*6, skp_N_ ## rule,astcur->pos); \
       astcur->depth--; \
     } else (void)0
 
@@ -884,7 +901,7 @@ typedef struct {
         } \
         skp_memoize(astcur, skp_M_ ## rule ,skp_N_ ## rule,sav_pos,sav_par_cnt); \
       } \
-      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", "MATCH\0FAILD"+(!!astfailed)*6, skp_N_ ## rule,astcur->pos); \
+      if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", skp_matchfailed+(!!astfailed)*6, skp_N_ ## rule,astcur->pos); \
       astcur->depth--; \
     } else (void)0
 
@@ -1104,6 +1121,8 @@ int32_t astnodelen(ast_t ast, int32_t node);
 
 extern char *skpemptystr;
 extern char *skp_msg_leftrecursion;
+extern char *skp_matchfailed;
+
 
 #define skpgeterrmsg() (astcur->err_msg)
 #define skpseterrmsg(m) skp_seterrmsg(astcur,m)
@@ -1115,6 +1134,7 @@ static inline void skp_seterrmsg(ast_t ast, char *msg)
 
 char *skpemptystr = "";
 char *skp_msg_leftrecursion = "Left recursion detected";
+char *skp_matchfailed = "MATCH\0FAILD";
 
 static int skp_par_makeroom(ast_t ast,int32_t needed);
 static int skp_nodes_makeroom(ast_t ast,int32_t needed);
