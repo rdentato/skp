@@ -9,7 +9,7 @@ CLOSEPAR  = _"S ')' S" ;
 CMP       = _"'='\1 '<>'\2 '<='\3 '<'\4 '>='\5 '>'\6" #? ;
 DOT       = _"S '.' S" ;
 EOF       = _"S !." ;
-EQUAL     = _"S '= 'S" ;
+EQUAL     = _"S '=' S" ;
 NAME      = _"I" ;
 NUMBER    = _"D" ;
 OPENPAR   = _"S '(' S" ;
