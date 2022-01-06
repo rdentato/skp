@@ -108,28 +108,28 @@ expr =  _term ( _spc_ op[] _term  )* {?fixprec(astcur); } ;
 term = _spc_  ( assign #4
               / varref 
               / number
-              / _"(&*s" expr _"&*s)"
+              / _"'(' *s" expr _"*s ')'"
               / unopterm
               );
 
-unopterm = _"+\1-\2!\3" #? ^^term;
+unopterm = _"'+'\1 '-'\2 '!'\3" #? ^^term;
 
-varref = #16 _"++\2--\3" #? lvalue
-       / lvalue _spc_ (_"++\4--\5" #? )?
+varref = #16 _"'++'\2 '--'\3" #? lvalue
+       / lvalue _spc_ (_"'++'\4 '--'\5" #? )?
        ;
 
-lvalue = _spc_ "&I" varindex? ;
+lvalue = _spc_ "I" varindex? ;
 
-varindex = _"&*s[&*s" ^^array_index _"&*s]" #?20 /
-           _"." lvalue #?30 / _"&*s->&*s" lvalue #?40;
+varindex = _"*s '[' *s" ^^array_index _"*s']'" #?20 /
+           _"'.'" lvalue #?30 / _"*s '->' *s" lvalue #?40;
 
 array_index = ^^expr;
 
 assign = varref _spc_ assign_op  _spc_ ^^expr;
-assign_op = #2 (_"&[&!^%*/+-]\1>>\1<<" #?)? _"=" ;
+assign_op = #2 (_"[&!^%*/+-]\1'>>'\1'<<'" #?)? _"=" ;
 
-number = _"0&[xX]&X\7" #?/ _"&F\6" #?;
+number = _"'0' [xX] X\7" #?/ _"F\6" #?;
 
-unaryop = _"&[*!~-]";
-spc_ = _"&*s\1%%&N";
+unaryop = _"[*!~-]";
+spc_ = _"*s\1'%%' N";
 

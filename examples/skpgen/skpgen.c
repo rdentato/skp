@@ -1,44 +1,26 @@
 #define SKP_MAIN
 #include "skp.h"
 
-/*
-// grammar = (_'&*s' ruledef)+  _'&*s&!.' ;
-// ruledef = rulename _'&*s=&*s' alt _'&*s;' ;
-// alt = seq (_'&*s/' seq)* ;
-// seq = (_'&*s' match)+ ;
-// match = string repeat? /  match_term repeat? / '&[!&]' _'&*s' match ;
-// match_term = _'(' alt _'&*s)' / '&?[^_<]' rulename ;
-// repeat = _"&*s" "&[*+?]" ;
-// string = '&?[_]' "&Q" ;
-// rulename = "&I" ;
-// spc = (&+s / '#&N')*
-*/
-
-// grammar = (_'&*s' ruledef)+  _'&*s&!.' ;
 skpdef(grammar) {
   skprule_(spc_);
   skpmany{       skprule(code); 
            skpor skprule_(ruledef);
            skprule_(spc_);
          }
-  skpmatch_("&!.");
+  skpmatch_("!.");
 }
-
-// ruledef = rulename _'&*s=&*s' alt _'&*s;' ;
-// rulename = "&I" ;
 
 skpdef(ruledef) {
-  skprule(rulename); skprule_(spc_); skpmatch_("=");
+  skprule(rulename); skprule_(spc_); skpmatch_("'='");
                      skprule_(alt); //astlift; 
-                     skprule_(spc_); skpmatch_(";");
+                     skprule_(spc_); skpmatch_("';'");
 }
 
-skpdef(rulename) { skpmatch_("&I"); }
+skpdef(rulename) { skpmatch_("I"); }
 
-// alt =  alt_once ( _spc_ _'&*s/' alt_or)* ;
 skpdef(alt) {
   skprule(alt_once);
-  skpany{ skprule_(spc_); skpmatch_("/");  skprule(alt_or); }
+  skpany{ skprule_(spc_); skpmatch_("'/'");  skprule(alt_or); }
 }
 
 skpdef(alt_once) {
@@ -49,25 +31,20 @@ skpdef(alt_or) {
   skprule_(seq);
 }
 
-// seq = (_'&*s' match)+ ;
 skpdef(seq) {
   skpmany{ skprule_(spc_); 
                  skprule(incode);
-           skpor { skpmatch_("#"); skprule(retval); }
-           skpor { skpmatch("&[!&]\4"); skprule_(match); }
+           skpor { skpmatch_("'#'"); skprule(retval); }
+           skpor { skpmatch("[!&]\4"); skprule_(match); }
            skpor skprule_(match); 
          }
 }
 
 skpdef(retval) {
-  skpmatch_("&?'?'");
-  skpmaybe skpmatch_("&D");
+  skpmatch_("?'?'");
+  skpmaybe skpmatch_("D");
 }
 
-// match =  match_term repeat? / '&[!&]\4' match / _'#' '&D';
-// match_term = string / _'(' _spc_ alt _spc_ _')' / '_\5<\5^^\5^' rulenameref ;
-// repeat = _"&*s" "&[*+?]" ;
-// string = '&?[_]' "&Q" ;
 skpdef(match) {
   skponce { skprule(match_term); skprule(repeat);
             astswapnoempty;
@@ -75,15 +52,12 @@ skpdef(match) {
           } 
 }
  
-skpdef(repeat) { skpmatch_("&?[+*?]"); }
-
-// match_term = _'(' alt _'&*s)' / '&?[^_<]' rulename ;
-// rulename = "&I" ; skpmatch("&*[^_<]\5"); 
+skpdef(repeat) { skpmatch_("?[+*?]"); }
 
 skpdef(match_term) {
   skponce { skprule(modifier); astnoemptyleaf;
             skponce { skprule(pattern); }
-              skpor { skprule(chkfun); skpmatch_("&*s[&*s]&*s"); }
+              skpor { skprule(chkfun); skpmatch_("S '[' S ']' S"); }
               skpor { skprule(lookup); }
               skpor { skprule(ruleref); } 
           }
@@ -91,43 +65,43 @@ skpdef(match_term) {
             skprule(alt); astliftall;
             skprule_(spc_); skpstring_(")");
           }
-    skpor { skpstring_("#"); skpmatch("&D"); /*skptrace("INFO: %d %d",astfailed, *astcurfrom);*/ }
+    skpor { skpstring_("#"); skpmatch("D"); /*skptrace("INFO: %d %d",astfailed, *astcurfrom);*/ }
 }
 
-skpdef(ruleref)  { skpmatch_("&I&!@&*s:"); }
-skpdef(pattern)  { skpmatch_("&Q"); }
+skpdef(ruleref)  { skpmatch_("I !@ S ':'"); }
+skpdef(pattern)  { skpmatch_("Q"); }
 skpdef(modifier) {
-    skpmatch_("&?'_'&?[!?]&?'<'&?'?'&?'^'&?'^'");
+    skpmatch_("?'_' ?[!?] ?'<' ?'?' ?'^' ?'^'");
 }
 
-skpdef(chkfun) { skpmatch_("&I"); };
+skpdef(chkfun) { skpmatch_("I"); };
 
 // lkup [ TOK: expr; expr; TOK2: expr; ]
 
 skpdef(lookup) {
   skprule(lu_func);
-  skpmatch_("&*s[");
+  skpmatch_("S'['");
   skpmany {
     skprule_(spc_);
     skprule(lu_case);
-    skpmatch_("&*s:&*s");
+    skpmatch_("S ':' S");
     skprule(alt_case);
     skprule_(spc_);
-    skpmatch_(";");
+    skpmatch_("';'");
    _skptrace("lkup %d '%.4s'",astfailed,astcurfrom);
   }
-  skpmatch_("&*s]");
+  skpmatch_("S ']'");
 }
 
-skpdef(lu_func) { skpmatch_("&I") ;}
-skpdef(lu_case) { skpmatch_("&I\1&D"); }
+skpdef(lu_func) { skpmatch_("I") ;}
+skpdef(lu_case) { skpmatch_("I\1D"); }
 skpdef(alt_case) { skprule_(alt); }
 
-skpdef(code) {skpmatch_("&@{"); skpmatch_("&B"); }
-skpdef(incode) {skpmatch_("&@{"); skpmatch_("&B"); }
+skpdef(code) {skpmatch_("@'{'"); skpmatch_("B"); }
+skpdef(incode) {skpmatch_("@'{'"); skpmatch_("B"); }
 
-skpdef(spc_) { skpany{ skpmatch_("&+s\1%%&N"); } }
-skpdef(spc) { skpmany{ skpmatch_("&+s\1%%&N"); } }
+skpdef(spc_) { skpany{ skpmatch_("+s\1 '%%' N"); } }
+skpdef(spc) { skpmany{ skpmatch_("+s\1 '%%' N"); } }
 
 /************************************/
 

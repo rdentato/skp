@@ -3,35 +3,35 @@
 %%
 %%  The __ rule is for 0 or more spaces
 
-ASSIGN    = _"&*s:=&*s" ;
-COMMA     = _"&*s,&*s" ;
-CLOSEPAR  = _"&*s)&*s" ;
-CMP       = _"=\1<>\2<=\3<\4>=\5>\6" #? ;
-DOT       = _"&*s.&*s" ;
-EOF       = _"&*s&!." ;
-EQUAL     = _"&*s=&*s" ;
-NAME      = _"&I" ;
-NUMBER    = _"&D" ;
-OPENPAR   = _"&*s(&*s" ;
-SEMICOLON = _"&*s;&*s" ;
-STRING    = _"&@'" _"&Q" ;    %% single quoted string but escaped quote is \' not '''
-_         = _"&*s" ;
+ASSIGN    = _"S ':=' S" ;
+COMMA     = _"S ',' S" ;
+CLOSEPAR  = _"S ')' S" ;
+CMP       = _"'='\1 '<>'\2 '<='\3 '<'\4 '>='\5 '>'\6" #? ;
+DOT       = _"S '.' S" ;
+EOF       = _"S !." ;
+EQUAL     = _"S '= 'S" ;
+NAME      = _"I" ;
+NUMBER    = _"D" ;
+OPENPAR   = _"S '(' S" ;
+SEMICOLON = _"S ';' S" ;
+STRING    = _"@`'`" _"Q" ;    %% single quoted string but escaped quote is \' not '''
+_         = _"S" ;
 
-BEGIN     = __ _"&!Cbegin&!@&a" __ ;
-CONST     = __ _"&!Cconst&!@&a" __;
-DO        = __ _"&!Cdo&!@&a" __ ;
-EVEN      = __ _"&!Ceven&!@&a" __;
-END       = __ _"&!Cend&!@&a" __;
-FUNCTION  = __ _"&!Cfunction&!@&a" __;
-IF        = __ _"&!Cif&!@&a" __;
-ODD       = __ _"&!Codd&!@&a" __;
-PROGRAM   = __ _"&!Cprogram&!@&a" __;
-READ      = __ _"&!Cread&!@&a" __ ;
-RETURN    = __ _"&!Creturn&!@&a" __;
-THEN      = __ _"&!Cthen&!@&a" __ ;
-VAR       = __ _"&!Cvar&!@&a" __;
-WHILE     = __ _"&!Cwhile&!@&a" __;
-WRITE     = __ _"&!Cwrite&!@&a" __ ;
+BEGIN     = __ _"!C 'begin' !@ a" __ ;
+CONST     = __ _"!C 'const' !@ a" __;
+DO        = __ _"!C 'do' !@ a" __ ;
+EVEN      = __ _"!C 'even' !@ a" __;
+END       = __ _"!C 'end' !@ a" __;
+FUNCTION  = __ _"!C 'function' !@ a" __;
+IF        = __ _"!C 'if' !@ a" __;
+ODD       = __ _"!C 'odd' !@ a" __;
+PROGRAM   = __ _"!C 'program' !@ a" __;
+READ      = __ _"!C 'read' !@ a" __ ;
+RETURN    = __ _"!C 'return' !@ a" __;
+THEN      = __ _"!C 'then' !@ a" __ ;
+VAR       = __ _"!C 'var' !@ a" __;
+WHILE     = __ _"!C 'while' !@ a" __;
+WRITE     = __ _"!C 'write' !@ a" __ ;
 
 program   = _PROGRAM prog_name (_OPENPAR prog_args _CLOSEPAR)? _block _DOT _EOF ;
 prog_name = _NAME ;
@@ -79,9 +79,9 @@ fncall_name  = _NAME ;
 fncall_arg   =  expr ;
 fncall_comma = _COMMA ;
 
-sign    = _"+\2-\3" ;
-add_op  = _"+\2-\3" ;
-mult_op = _"*\4/\6" ;
+sign    = _"'+'\2 '-'\3" ;
+add_op  = _"'+'\2 '-'\3" ;
+mult_op = _"'*'\4 '/'\6" ;
 
 statement = __ (compound_stmt / _simple_stmt) ;
 

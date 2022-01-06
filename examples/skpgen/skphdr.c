@@ -14,7 +14,7 @@ void prtdef(char *def)
 {
   char *end;
 
-  skp(def,"&I",&end);
+  skp(def,"I",&end);
   fprintf(out,"extern char *SKP_N_%.*s;\n",(int)(end-def),def);
 }
 char *emptystr ="";
@@ -34,21 +34,21 @@ int main(int argc, char *argv[])
      while (*s) {
        if (*s && (state == IN_CODE)) {
          skp(s) {
-           skpif("&+![s/'\"]") ;
-           skpif("skpdef&*s(&*s") {
+           skpif("+![s/'\"]") ;
+           skpif("'skpdef' S '(' S") {
              prtdef(skpto);  s = emptystr; break;
            }
-           skpif("//") { s = emptystr; break; }
-           skpif("/*") { state = IN_COMMENT; break;}
-           skpif("&Q") ;
-           skpif("&.") ;
+           skpif("'//'") { s = emptystr; break; }
+           skpif("'/*'") { state = IN_COMMENT; break;}
+           skpif("Q") ;
+           skpif(".") ;
          }
        }
        if (*s && (state == IN_COMMENT)) {
          skp(s) {
-           skpif("&+![*]") ;
-           skpif("*/") { s = skpend; state = IN_CODE; break; }
-           skpif("&.") ;
+           skpif("+!'*'") ;
+           skpif("'*/'") { s = skpend; state = IN_CODE; break; }
+           skpif(".") ;
          }
        }
      }
