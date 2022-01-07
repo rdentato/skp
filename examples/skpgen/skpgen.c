@@ -4,7 +4,7 @@
 skpdef(grammar) {
   skprule_(spc_);
   skpmany{       skprule(code); 
-           skpor skprule_(ruledef);
+           skpor skprule(ruledef);
            skprule_(spc_);
          }
   skpmatch_("!.");
@@ -147,6 +147,18 @@ void prtmodifier(uint8_t modifier, FILE *src)
   if (modifier & MOD_SWAPNOEMPTY) fprintf(src," astswapnoempty;");
 }
 
+void prtruledef(char *from, int32_t len, FILE *src)
+{
+  fprintf(src,"\n// ");
+  while (len--) {
+     fputc(*from,src);
+     if (*from == '\n') fprintf(src,"// ");
+     from++;
+  }
+  fputc('\n',src);
+}
+
+
 uint8_t altstk[256];
 uint8_t stkcnt = 0;
 #define push(n) (altstk[stkcnt++] = (n))
@@ -155,7 +167,6 @@ uint8_t stkcnt = 0;
 
 void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
 {
-  int rules = 0;
   uint8_t modifier = 0;
   char repeat = '\0';
   uint8_t rpt;
@@ -166,13 +177,16 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
   astvisit(ast) {
     astifentry {
        astifnodeis(grammar) {
-        fprintf(src,"#include \"skp.h\"\n\n");
+        fprintf(src,"#include \"skp.h\"\n");
         line_pos = astcurfrom;
        _skptrace("LN0: (%p) '%.4s",(void*)line_pos,line_pos);
       }
 
+      astifnodeis(ruledef) {
+        if (nl == '\n') prtruledef(astcurfrom, astcurlen, src);
+      }
+
       astifnodeis(rulename) {
-        if (rules++ >0) fprintf(src,"}\n\n");
         // count the number of nl and add them to line
         while (line_pos < astcurfrom) {
          _skptrace("LN1: (%p) (%p) '%.4s",(void*)astcurfrom,(void*)line_pos,line_pos);
@@ -180,7 +194,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
           if (*line_pos == '\n' ) { line++; }
           line_pos++;
         }
-        fprintf(src,"#line %d\n",line);
+        if (nl == ' ') fprintf(src,"#line %d\n",line);
         fprintf(src,"skpdef(%.*s) {%c",astcurlen, astcurfrom,nl);
         indent = 2;
         fprintf(hdr,"extern char *skp_N_%.*s;\n",astcurlen, astcurfrom);
@@ -316,35 +330,43 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
       }
 
       astifnodeis(code) {
-        if (rules >0) { fprintf(src,"}\n\n"); indent = 0; rules = 0; }
         char *start = astcurfrom+1; int len = astcurlen-2;
         if (*start == '?') {
           fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
         }
         else fprintf(src,"%.*s",len,start);
-        fprintf(src,"#line %d",line);
       }
+
       astifnodeis(incode) {
         char *start = astcurfrom+1; int len = astcurlen-2;
+        fprintf(src,"%*s",indent,skpemptystr);
         if (*start == '?') {
-          fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
+          fprintf(src,"if (!astfailed) { ");
+          len--; start++;
         }
-        else fprintf(src,"%.*s",len,start);
-        fprintf(src,"#line %d",line);
+        fprintf(src,"%.*s ",len,start);
+        if (start != astcurfrom+1) {
+          fprintf(src,"}");
+        }
+        fprintf(src,"%c",nl);
       }
     }
     astifexit {
+      astifnodeis(ruledef) {
+        fprintf(src,"}\n");
+      }
+
       astifnodeis(alt_or, alt_once, alt, lookup) {
         rpt = pop();
         while (rpt-- > 0) {indent -=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
       }
+
       astifnodeis(alt_case) {
         fprintf(src,"%*sbreak;%c",indent,skpemptystr,nl);
         indent -=4;
       }
     }
   }
-  if (rules >0 ) fprintf(src,"}\n");
 }
 
 /************************************/
@@ -382,8 +404,9 @@ char *loadsource(char *fname)
 #define trace(...) (fprintf(stderr,__VA_ARGS__),fputc('\n',stderr))
 void usage()
 {
-  fprintf(stderr,"Usage: skpgen grammar\n");
-  fprintf(stderr,"  Use grammar.skp to generate grammar.c and grammar.h\n");
+  fprintf(stderr,"Usage: skpgen [-c] grammar\n");
+  fprintf(stderr,"      Generate grammar.c and grammar.h from grammar.skp\n");
+  fprintf(stderr,"  -c  Generate a readable .c source file\n");
   exit(1);
 }
 
@@ -393,12 +416,18 @@ int main(int argc, char *argv[])
   ast_t ast = NULL;
   FILE *src=NULL;
   FILE *hdr=NULL;
-
   int newline = ' ';
+  int argn = 1;
 
   if (argc<2) usage();
 
-  grammarbuf = loadsource(argv[1]);
+  if (argv[1][0] == '-' && argv[1][1] == 'c') {
+    newline = '\n';
+    argn++;
+    if (argc <= argn) usage();
+  }
+  
+  grammarbuf = loadsource(argv[argn]);
 
   if (!grammarbuf) usage();
 
@@ -418,23 +447,23 @@ int main(int argc, char *argv[])
   }
   else {
 
-    snprintf(fnamebuf,MAXFNAME,"%s.t",argv[1]);
+    snprintf(fnamebuf,MAXFNAME,"%s.t",argv[argn]);
     src=fopen(fnamebuf,"w");
     if (src) {
       astprint(ast,src);
       fprintf(src,"\n");
       fclose(src);
     }
-    snprintf(fnamebuf,MAXFNAME,"%s.c",argv[1]);
+    snprintf(fnamebuf,MAXFNAME,"%s.c",argv[argn]);
     src = fopen(fnamebuf,"w");
     if (src) {
-      fprintf(src,"#line 1 \"%s.skp\"\n",argv[1]);
-      snprintf(fnamebuf,MAXFNAME,"%s.h",argv[1]);
+      if (newline == ' ') fprintf(src,"#line 1 \"%s.skp\"\n",argv[argn]);
+      snprintf(fnamebuf,MAXFNAME,"%s.h",argv[argn]);
       hdr = fopen(fnamebuf,"w");
       if (hdr) {
         fprintf(hdr,"#include \"skp.h\"\n");
-        fprintf(hdr,"#ifndef SKP_PARSE_%s\n",argv[1]);
-        fprintf(hdr,"#define SKP_PARSE_%s\n",argv[1]);
+        fprintf(hdr,"#ifndef SKP_PARSE_%s\n",argv[argn]);
+        fprintf(hdr,"#define SKP_PARSE_%s\n",argv[argn]);
         generatecode(ast,src,hdr,newline);
       }
     }

@@ -126,7 +126,7 @@ varindex = _"*s '[' *s" ^^array_index _"*s']'" #?20 /
 array_index = ^^expr;
 
 assign = varref _spc_ assign_op  _spc_ ^^expr;
-assign_op = #2 (_"[&!^%*/+-]\1'>>'\1'<<'" #?)? _"=" ;
+assign_op = #2 (_"[&!^%/+*-]\1'>>'\1'<<'" #?)? _"=" ;
 
 number = _"'0' [xX] X\7" #?/ _"F\6" #?;
 
