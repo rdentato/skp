@@ -711,6 +711,7 @@ typedef struct ast_s {
 int skp_debug2(ast_t ast,uint8_t d);
 
 #define astfailed (astcur->fail)
+#define astfail ((astcur->fail) = 1)
 
 //  Getting error infomration
 char   *asterrrule(ast_t ast);   // ◄── Which rule we got the error
@@ -1018,6 +1019,8 @@ int32_t astlast(ast_t ast, int32_t node);  // rightmost sibling
 
 #define astlastinfo (astcur->lastinfo)
 #define astsetlastinfo(n) (astcur->lastinfo = n)
+
+#define astcurnodeis(...) astnodeis(astcur,astcurnode,__VA_ARGS__)
 
 #define astnodeis(...) skp_varg(ast_nodeis,__VA_ARGS__)
 #define ast_nodeis1(a)   skp_zero
