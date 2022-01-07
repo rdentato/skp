@@ -1,0 +1,144 @@
+% # Lox grammar
+%   From the book "Crafting Interpreters" by Robert Nystrom
+%   http://craftinginterpreters.com/appendix-i.html
+%
+
+% ## Declarations
+%
+% A program is a series of declarations, which are the statements that
+% bind new identifiers or any of the other statement types.
+
+program      = ( __ declaration )* _EOF_ ;
+
+declaration  = classDecl
+             / funDecl
+             / varDecl
+             / statement ;
+
+classDecl    = _CLASS __ IDENTIFIER ( INHERIT __ IDENTIFIER )?
+               _OPN_BRACE function* _CLS_BRACE 
+             ;
+
+funDecl      = _FUN function ;
+varDecl      = _VAR __ IDENTIFIER ( EQUAL __ expression )? _SEMICOLON ;
+
+% ## Statements
+%
+% The remaining statement rules produce side effects, but do not
+% introduce bindings.
+
+statement    = exprStmt
+             / forStmt
+             / ifStmt
+             / printStmt
+             / returnStmt
+             / whileStmt
+             / block ;
+
+exprStmt     = expression _SEMICOLON ;
+forStmt      = _FOR _OPN_PAREN ( varDecl / exprStmt / _SEMICOLON )
+                         expression? _SEMICOLON
+                         expression? _CLS_PAREN statement
+             ;
+
+ifStmt       = _IF _OPN_PAREN expression _CLS_PAREN statement
+               ( ELSE statement )? ;
+printStmt    = _PRINT expression _SEMICOLON ;
+returnStmt   = _RETURN expression? _SEMICOLON ;
+whileStmt    = _WHILE _OPN_PAREN expression _CLS_PAREN statement ;
+block        = _OPN_BRACE declaration* _CLS_BRACE ;
+
+% Note that block is a statement rule, but is also used as a
+% nonterminal in a couple of other rules for things like function bodies.
+
+% ## Expressions
+%
+% Expressions produce values. Lox has a number of unary and binary 
+% operators with different levels of precedence. Some grammars for languages
+% do not directly encode the precedence relationships and specify that
+% elsewhere. Here, we use a separate rule for each precedence level to make
+% it explicit.
+
+expression   = __ assignment ;
+
+% CHANGE % In the book grammar, the `call` rule invoked by `assignment`
+         % would gobble up any sequence of `DOT` `IDENTIFIER` (PEG are
+         % greedy and possessive!) meaning that the last `IDENTIFIER`
+         % would have never matched.
+         % See the new `call` rule to see how this has been fixed.
+
+assignment   = ( call DOT )? IDENTIFIER EQUAL __ assignment
+             / logic_or 
+             ;
+
+logic_or     = logic_and ( OR logic_and )* ;
+logic_and    = equality ( AND equality )* ;
+equality     = comparison ( EQ_OP #? comparison )* ;
+comparison   = term ( CMP_OP #? term )* ;
+term         = factor ( ADD_OP factor )* ;
+factor       = unary ( MULT_OP unary )* ;
+
+% CHANGE % Need to allow for a potentially excluded `DOT` `IDENTIFIER`
+         % squence at the end
+% unary        = UNARY_OP unary / call ;
+unary        = UNARY_OP unary / call (DOT IDENTIFIER)? ;
+
+% CHANGE % Added the look ahead pattern `"@'.'"` to avoid `call` consuming
+         % all the sequence of `DOT` `IDENTIFIER`
+% call         = primary ( _OPN_PAREN arguments? _CLS_PAREN / DOT IDENTIFIER )* __ ;
+call         = primary ( _OPN_PAREN arguments? _CLS_PAREN / DOT IDENTIFIER _"@[.(]" )* __ ;
+
+primary      = TRUE / FALSE / NIL / THIS
+             / NUMBER / STRING / IDENTIFIER / _OPN_PAREN expression _CLS_PAREN
+             / SUPER DOT IDENTIFIER 
+             ;
+
+% Utility rules
+% In order to keep the above rules a little cleaner, some of the grammar
+% is split out into a few reused helper rules.
+
+function     = __ IDENTIFIER _OPN_PAREN parameters? _CLS_PAREN block ;
+parameters   = __ IDENTIFIER ( COMMA IDENTIFIER )* ;
+arguments    = expression ( COMMA expression )* ;
+
+% ## Lexical Grammar
+%
+% The lexical grammar is used by the scanner to group characters into tokens.
+% Where the syntax is context free, the lexical grammar is regular — note that
+% there are no recursive rules.
+
+ADD_OP      = __ _"'-'\1 '+'\2" #?              __;
+AND         = __ _$"and"                        __;
+CLASS       = __ _$"class" ;
+CLS_BRACE   = __ _$"}"                          __;
+CLS_PAREN   = __ _$")"                          __;
+CMP_OP      = __ _"'<='\1 '>='\2  '<'\3  '>'\4" #? __;
+COMMA       = __ _$","                          __;
+DOT         =    _$"." ;
+ELSE        = __ _$"else" ;
+EOF_        =    _"S!.";
+EQ_OP       = __ _"'!='\1 '=='\2" #?            __;
+EQUAL       = __ _$"="                          __;
+FALSE       = __ _$"false" ;
+FOR         = __ _$"for" ;
+FUN         = __ _$"fun" ;
+IDENTIFIER  =    _"I" ;
+IF          = __ _$"if" ;
+INHERIT     = __ _"<"                           __;
+MULT_OP     = __ _"'/'\1 '*'\2" #?              __;
+NIL         = __ _$"nil" ;
+NUMBER      =    _"D" _$"."? _"D"?;
+OPN_BRACE   = __ _$"{"                          __;
+OPN_PAREN   = __ _$"("                          __;
+OR          = __ _$"or"                         __;
+PRINT       = __ _$"print" ;
+RETURN      = __ _$"return" ;
+SEMICOLON   = __ _$";"                          __;
+SUPER       = __ _$"super" ;
+STRING      =    _"Q" ;
+THIS        = __ _$"this" ;
+TRUE        = __ _$"true" ;
+UNARY_OP    = __ _"'!'\1 '-'\2" #?                __;
+VAR         = __ _$"var" ;
+WHILE       = __ _$"while" ;
+_           =    (_"+s" / _"'//'N")* ;

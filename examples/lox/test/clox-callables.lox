@@ -1,0 +1,31 @@
+
+print clock();
+
+fun add(a, b) {
+  print a + b;
+}
+
+add(3, 10);
+
+fun sub(a, b) {
+  return a - b;
+}
+
+print sub(2, 1);
+
+fun makeCounter() {
+  var i = 0;
+  fun count() {
+    i = i + 1;
+    print i;
+  }
+
+  return count;
+}
+
+var counter = makeCounter();
+print counter;
+counter();
+counter();
+counter();
+counter();
