@@ -1,7 +1,0 @@
-input n ;
-while n <> 1 {
-  if n % 2 
-    then n = 3*n +1 ;
-    else n = n / 2;
-
-}
