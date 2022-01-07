@@ -35,9 +35,13 @@ skpdef(seq) {
   skpmany{ skprule_(spc_); 
                  skprule(incode);
            skpor { skpmatch_("'#'"); skprule(retval); }
-           skpor { skpmatch("[!&]\4"); skprule_(match); }
+           skpor { skpmaybe { skprule(lookahead);} skprule_(match); }
            skpor skprule_(match); 
          }
+}
+
+skpdef(lookahead) {
+  skpmatch_("[!&]\4");
 }
 
 skpdef(retval) {
@@ -69,7 +73,11 @@ skpdef(match_term) {
 }
 
 skpdef(ruleref)  { skpmatch_("I !@ S ':'"); }
-skpdef(pattern)  { skpmatch_("Q"); }
+
+skpdef(pattern)  { skpmaybe { skpstring_("$"); if (!astfailed) {astretval(1);} }
+                   skpmatch_("Q");
+                 }
+
 skpdef(modifier) {
     skpmatch_("?'_' ?[!?] ?'<' ?'?' ?'^' ?'^'");
 }
@@ -100,20 +108,24 @@ skpdef(alt_case) { skprule_(alt); }
 skpdef(code) {skpmatch_("@'{'"); skpmatch_("B"); }
 skpdef(incode) {skpmatch_("@'{'"); skpmatch_("B"); }
 
-skpdef(spc_) { skpany{ skpmatch_("+s\1 '%%' N"); } }
-skpdef(spc) { skpmany{ skpmatch_("+s\1 '%%' N"); } }
+skpdef(spc_) { skpany{ 
+                   skpmatch_("+s");
+                 skpor 
+                   skpmatch_("'%' N");
+               }
+             }
 
 /************************************/
 
 #define MAXFNAME 128
 static char fnamebuf[MAXFNAME];
 
-void prtrepeat(char repeat, int32_t indent, FILE *src)
+void prtrepeat(char repeat, int32_t indent, FILE *src, int nl)
 {
   switch (repeat) {
-    case '*' : fprintf(src,"%*.sskpany {\n",indent,skpemptystr); break;
-    case '+' : fprintf(src,"%*.sskpmany {\n",indent,skpemptystr); break;
-    case '?' : fprintf(src,"%*.sskpmaybe {\n",indent,skpemptystr); break;
+    case '*' : fprintf(src,"%*.sskpany {%c",indent,skpemptystr,nl); break;
+    case '+' : fprintf(src,"%*.sskpmany {%c",indent,skpemptystr,nl); break;
+    case '?' : fprintf(src,"%*.sskpmaybe {%c",indent,skpemptystr,nl); break;
   }
 }
 
@@ -141,23 +153,35 @@ uint8_t stkcnt = 0;
 #define pop()   (altstk[--stkcnt])
 
 
-void generatecode(ast_t ast, FILE *src, FILE *hdr)
+void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
 {
   int rules = 0;
   uint8_t modifier = 0;
   char repeat = '\0';
   uint8_t rpt;
   int32_t indent = 0;
+  int32_t line = 1 ;
+  char *line_pos = NULL ;
 
   astvisit(ast) {
     astifentry {
        astifnodeis(grammar) {
         fprintf(src,"#include \"skp.h\"\n\n");
+        line_pos = astcurfrom;
+       _skptrace("LN0: (%p) '%.4s",(void*)line_pos,line_pos);
       }
 
       astifnodeis(rulename) {
         if (rules++ >0) fprintf(src,"}\n\n");
-        fprintf(src,"skpdef(%.*s) {\n",astcurlen, astcurfrom);
+        // count the number of nl and add them to line
+        while (line_pos < astcurfrom) {
+         _skptrace("LN1: (%p) (%p) '%.4s",(void*)astcurfrom,(void*)line_pos,line_pos);
+          if (*line_pos == '\r' ) { line++; if (line_pos[1] == '\n') line_pos++;}
+          if (*line_pos == '\n' ) { line++; }
+          line_pos++;
+        }
+        fprintf(src,"#line %d\n",line);
+        fprintf(src,"skpdef(%.*s) {%c",astcurlen, astcurfrom,nl);
         indent = 2;
         fprintf(hdr,"extern char *skp_N_%.*s;\n",astcurlen, astcurfrom);
         fprintf(hdr,"void skp_R_%.*s();\n",astcurlen, astcurfrom);
@@ -195,42 +219,49 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
       }
 
       astifnodeis(ruleref) {
-        if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
+        if (repeat) { prtrepeat(repeat,indent,src,nl); indent+=2; }
         fprintf(src,"%*.sskprule%s", indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
         fprintf(src,"(%.*s);", astcurlen, astcurfrom);
         prtmodifier(modifier,src);
-        fprintf(src,"\n");
-        if (repeat) { indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
+        fprintf(src,"%c",nl);
+        if (repeat) { indent-=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
         repeat = '\0';
         modifier = 0;
       }
 
       astifnodeis(pattern) { 
-        if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
-        fprintf(src,"%*sskpmatch%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
-        fprintf(src,"(%.*s);",astcurlen,astcurfrom);
+        if (repeat) { prtrepeat(repeat,indent,src, nl); indent+=2; }
+        if (astcurnodeinfo == 1) {
+          fprintf(src,"%*sskpstring%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
+          fprintf(src,"(\"%.*s\");",astcurlen-3,astcurfrom+2);
+        }
+        else {
+          fprintf(src,"%*sskpmatch%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
+          fprintf(src,"(\"%.*s\");",astcurlen-2,astcurfrom+1);
+        }
+
         prtmodifier(modifier,src);
-        fprintf(src,"\n");
-        if (repeat) { indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
+        fprintf(src,"%c",nl);
+        if (repeat) { indent-=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
         repeat = '\0';
         modifier = 0;
       }
 
       astifnodeis(chkfun) { 
-        if (repeat) { prtrepeat(repeat,indent,src); indent+=2; }
+        if (repeat) { prtrepeat(repeat,indent,src,nl); indent+=2; }
         fprintf(src,"%*sskpcheck%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
         fprintf(src,"(%.*s);",astcurlen,astcurfrom);
         prtmodifier(modifier,src);
-        fprintf(src,"\n");
-        if (repeat) { indent-=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
+        fprintf(src,"%c",nl);
+        if (repeat) { indent-=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
         repeat = '\0';
         modifier = 0;
       }
 
       astifnodeis(lu_func) {
         rpt = 0;
-        if (repeat) { prtrepeat(repeat, indent, src); rpt++;}
-        fprintf(src,"%*sskplookup(%.*s) {\n",indent,skpemptystr,astcurlen,astcurfrom);
+        if (repeat) { prtrepeat(repeat, indent, src,nl); rpt++;}
+        fprintf(src,"%*sskplookup(%.*s) {%c",indent,skpemptystr,astcurlen,astcurfrom,nl);
         rpt++;
         indent += 2*rpt;
         push(rpt);
@@ -238,29 +269,29 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
       }
 
       astifnodeis(lu_case) {
-        fprintf(src,"%*scase %.*s:\n",indent,skpemptystr,astcurlen,astcurfrom);
+        fprintf(src,"%*scase %.*s:%c",indent,skpemptystr,astcurlen,astcurfrom,nl);
         indent +=4;
       }
       
       astifnodeis(retval) {
         char *s=astcurfrom;
         if (*astcurfrom == '?') {
-          fprintf(src,"%*sif (!astfailed) {\n",indent,skpemptystr);
+          fprintf(src,"%*sif (!astfailed) {%c",indent,skpemptystr,nl);
           s++; indent+=2;
         }
         fprintf(src,"%*sastretval(",indent,skpemptystr);
-        if (astcurto>s) fprintf(src,"%d);\n",atoi(s));
-        else fprintf(src,"astlastinfo);\n");
+        if (astcurto>s) fprintf(src,"%d);%c",atoi(s),nl);
+        else fprintf(src,"astlastinfo);%c",nl);
         if (*astcurfrom == '?') {
           indent-=2;
-          fprintf(src,"%*s}\n",indent,skpemptystr);
+          fprintf(src,"%*s}%c",indent,skpemptystr,nl);
         }
       }
 
       astifnodeis(alt) {
         rpt = 1;
-        if (repeat) { prtrepeat(repeat, indent, src); }
-        else fprintf(src,"%*sskpgroup {\n",indent,skpemptystr);
+        if (repeat) { prtrepeat(repeat, indent, src,nl); }
+        else fprintf(src,"%*sskpgroup {%c",indent,skpemptystr,nl);
         indent += 2*rpt;
         push(rpt);
         repeat = '\0';
@@ -268,9 +299,9 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
 
       astifnodeis(alt_once) {
         rpt = 0;
-        if (repeat) { prtrepeat(repeat, indent, src); rpt++;}
+        if (repeat) { prtrepeat(repeat, indent, src,nl); rpt++;}
         if (astnodeis(ast,astright(astcur,astcurnode),alt_or)) {
-          fprintf(src,"%*sskponce {\n",indent,skpemptystr);
+          fprintf(src,"%*sskponce {%c",indent,skpemptystr,nl);
           rpt++;
         }
         indent += 2*rpt;
@@ -279,7 +310,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
       }
 
       astifnodeis(alt_or) {
-        fprintf(src,"%*sskpor {\n",indent,skpemptystr); indent+=2;
+        fprintf(src,"%*sskpor {%c",indent,skpemptystr,nl); indent+=2;
         push(1);
         repeat = '\0';
       }
@@ -291,6 +322,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
           fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
         }
         else fprintf(src,"%.*s",len,start);
+        fprintf(src,"#line %d",line);
       }
       astifnodeis(incode) {
         char *start = astcurfrom+1; int len = astcurlen-2;
@@ -298,15 +330,16 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr)
           fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
         }
         else fprintf(src,"%.*s",len,start);
+        fprintf(src,"#line %d",line);
       }
     }
     astifexit {
       astifnodeis(alt_or, alt_once, alt, lookup) {
         rpt = pop();
-        while (rpt-- > 0) {indent -=2; fprintf(src,"%*s}\n",indent,skpemptystr); }
+        while (rpt-- > 0) {indent -=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
       }
       astifnodeis(alt_case) {
-        fprintf(src,"%*sbreak;\n",indent,skpemptystr);
+        fprintf(src,"%*sbreak;%c",indent,skpemptystr,nl);
         indent -=4;
       }
     }
@@ -360,7 +393,8 @@ int main(int argc, char *argv[])
   ast_t ast = NULL;
   FILE *src=NULL;
   FILE *hdr=NULL;
-  
+
+  int newline = ' ';
 
   if (argc<2) usage();
 
@@ -401,7 +435,7 @@ int main(int argc, char *argv[])
         fprintf(hdr,"#include \"skp.h\"\n");
         fprintf(hdr,"#ifndef SKP_PARSE_%s\n",argv[1]);
         fprintf(hdr,"#define SKP_PARSE_%s\n",argv[1]);
-        generatecode(ast,src,hdr);
+        generatecode(ast,src,hdr,newline);
       }
     }
   }

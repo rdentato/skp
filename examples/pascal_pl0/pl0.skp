@@ -1,7 +1,7 @@
-%% SKP grammar for a reduced version of Pascal based on PL0:
-%% http://www.felix-colibri.com/papers/compilers/pl0_grammar/pl0_grammar.html
-%%
-%%  The __ rule is for 0 or more spaces
+% SKP grammar for a reduced version of Pascal based on PL0:
+% http://www.felix-colibri.com/papers/compilers/pl0_grammar/pl0_grammar.html
+%
+%  The __ rule is for 0 or more spaces
 
 ASSIGN    = _"S ':=' S" ;
 COMMA     = _"S ',' S" ;
@@ -14,7 +14,7 @@ NAME      = _"I" ;
 NUMBER    = _"D" ;
 OPENPAR   = _"S '(' S" ;
 SEMICOLON = _"S ';' S" ;
-STRING    = _"@`'`" _"Q" ;    %% single quoted string but escaped quote is \' not '''
+STRING    = _"@`'`" _"Q" ;    % single quoted string but escaped quote is \' not '''
 _         = _"S" ;
 
 BEGIN     = __ _"!C 'begin' !@ a" __ ;
@@ -40,7 +40,7 @@ prog_arg  = _NAME ;
 
 block = decls _statement ;
 
-%% Modified the bnf to make it similar to what Pascal prescribes
+% Modified the bnf to make it similar to what Pascal prescribes
 decls = _const* _vardef* fndef* ;
 
 const      = _CONST _const_def ( _COMMA  _const_def )* _SEMICOLON ;
@@ -51,7 +51,7 @@ const_val  = _NUMBER ;
 vardef = _VAR __ vardef_name ( _COMMA vardef_name )* _SEMICOLON ;
 vardef_name  = _NAME ;
 
-%% Functions are limited to a single nesting level
+% Functions are limited to a single nesting level
 fndef = _FUNCTION __ fndef_name _OPENPAR fndef_args _CLOSEPAR _fnblock _SEMICOLON ;
 fndef_name = _NAME ;
 
@@ -60,14 +60,14 @@ fndef_arg   = _NAME ;
 fndef_comma = _COMMA ;
 
 fnblock = fndecls _statement ;
-fndecls = const* vardef*;    %% No embedded functions!
+fndecls = const* vardef*;    % No embedded functions!
 
 expr   = sign? __ _term ( __ add_op __ _term )* ;
 term   = _factor ( __ mult_op __ _factor )* ;
 
 factor = fncall
        / value
-       / idref                   %% <-- Can be a variable or a const
+       / idref                   % <-- Can be a variable or a const
        / _OPENPAR expr _CLOSEPAR
        ;
 
@@ -88,7 +88,7 @@ statement = __ (compound_stmt / _simple_stmt) ;
 compound_stmt = _BEGIN _statement? (_SEMICOLON _statement )* _END ;
 
 simple_stmt =  write_stmt
-            / _read_stmt     %% Not in the original bnf!
+            / _read_stmt     % Not in the original bnf!
             /  if_stmt
             /  while_stmt
             /  return_stmt
@@ -104,7 +104,7 @@ while_stmt = _WHILE condition _DO _statement ;
 
 return_stmt = _RETURN expr ;
 
-write_stmt = _WRITE ( STRING #?1 / expr ) ;   %% STRING Not in the original bnf!
+write_stmt = _WRITE ( STRING #?1 / expr ) ;   % STRING Not in the original bnf!
 
 read_stmt = _READ readvar;
 readvar   = _NAME ;
