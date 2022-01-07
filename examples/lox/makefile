@@ -4,7 +4,7 @@ TOP=../..
 SKPGEN=../skpgen/skpgen
 
 CC=gcc
-#CC=clang
+##CC=clang
 
 OPT=-O2
 OPT=-O2 -Os -fdata-sections -ffunction-sections
@@ -30,4 +30,4 @@ lox.c: lox.skp
 
 clean:
 	$(RM) *.o lox lox.c lox.h lox.t
-	$(RM) lox/*.t lox/*.o
+	$(RM) test/*.t test/*.o

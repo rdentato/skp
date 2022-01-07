@@ -11,7 +11,7 @@
  
 progam = line*
  
-line = number statement EOL
+line = number? statement EOL
 
 statement = "PRINT" pr-expr-list  /
             "INPUT" in-var-list   /
@@ -37,13 +37,15 @@ term = fact (('*' / '/') fact)*
 fact = '-' fact / '(' expr ')' / num / var / fun
 
 fun = 'RND' '(' expr ')' /
-      'PEEK' '(' expr ')' 
+      'PEEK' '(' expr ')' /
+      'ABS'  '(' expr ')' /
 
 relop = '<' ('>' | '=')? | '>' '='? | '='
 
 number = digit digit*
    
 digit = '0' | '1' | '2' | '3' | ... | '8' | '9'
+char = ' ' .. '~'
  
 EOL =  '\r'?\n' 
 */
@@ -51,18 +53,19 @@ EOL =  '\r'?\n'
 #define SKP_MAIN
 #include "skp.h"
 
-#define TOK_PRINT  100
-#define TOK_INPUT  101
-#define TOK_LET    102
-#define TOK_GOTO   103
-#define TOK_GOSUB  104
-#define TOK_FOR    105
-#define TOK_NEXT   106
-#define TOK_RETURN 107
-#define TOK_IF     108
-#define TOK_END    109
-#define TOK_REM    110
-#define TOK_POKE   111
+#define TOK_END     -1 
+#define TOK_FOR     -2
+#define TOK_GOSUB   -3
+#define TOK_GOTO    -4 
+#define TOK_IF      -5
+#define TOK_INPUT   -5
+#define TOK_LET     -6  
+#define TOK_NEXT    -7 
+#define TOK_POKE    -8
+#define TOK_PRINT   -9  
+#define TOK_REM     -10  
+#define TOK_RETURN  -11 
+
 
 skpdef(program) {
   skpmany {
@@ -78,6 +81,27 @@ skpdef(line) {
   skpmatch_("&*w");
   skprule_(statement);
   skpmatch_("&*s");
+}
+
+char *keyw[] = {
+  "\x01END",
+  "\x02FOR",
+  "\x03GOSUB",
+  "\x04GOTO",
+  "\x05IF",
+  "\x05INPUT",
+  "\x06LET",
+  "\x07NEXT",
+  "\x08POKE"
+  "\x09PRINT",
+  "\x0AREM",
+  "\x0BRETURN",
+};
+
+int32_t keywords(char **src)
+{
+   char kw[8];
+   
 }
 
 skpdef(statement) {
@@ -241,14 +265,24 @@ int main(int argc, char *argv[])
   if (source) {
     ast = skpparse(source,program);
 
-    if (asterror(ast)) {
-      trace("Error @: '%s'",asterror(ast));
-      trace("In rule: '%s'",asterrorrule(ast));
-    }
-    else {
-      astprint(ast,stdout);
-      printf("\n");
-    }
+  if (asterrpos(ast)) {
+    trace("In rule: '%s'",asterrrule(ast));
+    char *ln = asterrline(ast);
+    char *endln = ln;
+    while (*endln && *endln != '\r' && *endln != '\n') endln++;
+    int32_t col = asterrcolnum(ast);
+    trace("Error: %s",asterrmsg(ast));
+    trace("%.*s",(int)(endln-ln),ln);
+    trace("%.*s^",col,"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+    //trace("Error '%s'",asterrmsg(ast));
+    //trace("@: '%s'",asterrpos(ast));
+  }
+  else {
+    astprint(ast,stderr);
+    fprintf(stderr,"\n");
+
+  }
+
   
     free(source);
     astfree(ast);

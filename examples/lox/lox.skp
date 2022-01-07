@@ -65,7 +65,7 @@ expression   = __ assignment ;
          % would gobble up any sequence of `DOT` `IDENTIFIER` (PEG are
          % greedy and possessive!) meaning that the last `IDENTIFIER`
          % would have never matched.
-         % See the new `call` rule to see how this has been fixed.
+         % Check the new `call` rule to see how this has been fixed.
 
 assignment   = ( call DOT )? IDENTIFIER EQUAL __ assignment
              / logic_or 
@@ -83,10 +83,10 @@ factor       = unary ( MULT_OP unary )* ;
 % unary        = UNARY_OP unary / call ;
 unary        = UNARY_OP unary / call (DOT IDENTIFIER)? ;
 
-% CHANGE % Added the look ahead pattern `"@'.'"` to avoid `call` consuming
+% CHANGE % Added the look ahead pattern `"&[.(]"` to avoid `call` consuming
          % all the sequence of `DOT` `IDENTIFIER`
 % call         = primary ( _OPN_PAREN arguments? _CLS_PAREN / DOT IDENTIFIER )* __ ;
-call         = primary ( _OPN_PAREN arguments? _CLS_PAREN / DOT IDENTIFIER _"@[.(]" )* __ ;
+call         = primary ( _OPN_PAREN arguments? _CLS_PAREN / DOT IDENTIFIER _"&[.(]" )* __ ;
 
 primary      = TRUE / FALSE / NIL / THIS
              / NUMBER / STRING / IDENTIFIER / _OPN_PAREN expression _CLS_PAREN
@@ -107,38 +107,43 @@ arguments    = expression ( COMMA expression )* ;
 % Where the syntax is context free, the lexical grammar is regular — note that
 % there are no recursive rules.
 
-ADD_OP      = __ _"'-'\1 '+'\2" #?              __;
-AND         = __ _$"and"                        __;
-CLASS       = __ _$"class" ;
-CLS_BRACE   = __ _$"}"                          __;
-CLS_PAREN   = __ _$")"                          __;
+AND         = __ _"'and'    !& i" __;
+CLASS       = __ _"'class'  !& i" __;
+ELSE        = __ _"'else'   !& i" __;
+FALSE       = __ _"'false'  !& i" __;
+FOR         = __ _"'for'    !& i" __;
+FUN         = __ _"'fun'    !& i" __;
+IF          = __ _"'if'     !& i" __;
+NIL         = __ _"'nil'    !& i" __;
+OR          = __ _"'or'     !& i" __;
+PRINT       = __ _"'print'  !& i" __;
+RETURN      = __ _"'return' !& i" __;
+SUPER       = __ _"'super'  !& i" __;
+THIS        = __ _"'this'   !& i" __;
+TRUE        = __ _"'true'   !& i" __;
+VAR         = __ _"'var'    !& i" __;
+WHILE       = __ _"'while'  !& i" __;
+
+ADD_OP      = __ _"'-'\1  '+'\2"  #? __;
 CMP_OP      = __ _"'<='\1 '>='\2  '<'\3  '>'\4" #? __;
-COMMA       = __ _$","                          __;
+EQ_OP       = __ _"'!='\1 '=='\2" #? __;
+MULT_OP     = __ _"'/'\1  '*'\2"  #? __;
+UNARY_OP    = __ _"'!'\1  '-'\2"  #? __;
+EQUAL       = __ _$"=" __;
+
+CLS_BRACE   = __ _$"}" __;
+CLS_PAREN   = __ _$")" __;
+OPN_BRACE   = __ _$"{" __;
+OPN_PAREN   = __ _$"(" __;
+
+COMMA       = __ _$"," __;
 DOT         =    _$"." ;
-ELSE        = __ _$"else" ;
-EOF_        =    _"S!.";
-EQ_OP       = __ _"'!='\1 '=='\2" #?            __;
-EQUAL       = __ _$"="                          __;
-FALSE       = __ _$"false" ;
-FOR         = __ _$"for" ;
-FUN         = __ _$"fun" ;
+INHERIT     = __ _"<" __;
+SEMICOLON   = __ _$";" __;
+
 IDENTIFIER  =    _"I" ;
-IF          = __ _$"if" ;
-INHERIT     = __ _"<"                           __;
-MULT_OP     = __ _"'/'\1 '*'\2" #?              __;
-NIL         = __ _$"nil" ;
-NUMBER      =    _"D" _$"."? _"+d"?;
-OPN_BRACE   = __ _$"{"                          __;
-OPN_PAREN   = __ _$"("                          __;
-OR          = __ _$"or"                         __;
-PRINT       = __ _$"print" ;
-RETURN      = __ _$"return" ;
-SEMICOLON   = __ _$";"                          __;
-SUPER       = __ _$"super" ;
+NUMBER      =    _"D" _$"."? _"+d"? ;
 STRING      =    _"Q" ;
-THIS        = __ _$"this" ;
-TRUE        = __ _$"true" ;
-UNARY_OP    = __ _"'!'\1 '-'\2" #?                __;
-VAR         = __ _$"var" ;
-WHILE       = __ _$"while" ;
+
+EOF_        = __ _"!." ;
 _           =    (_"+s" / _"'//'N")* ;
