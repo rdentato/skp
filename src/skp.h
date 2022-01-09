@@ -52,7 +52,7 @@ typedef struct {
 
 #define skpif(p) if (skpalt || !(skpalt = skp_(skpstart,p,&skpto,&skpend))) ; else
 
-#define skpelse(p) if (skpalt || !(skpend = skpto = skpstart)) ; else
+#define skpelse  if (skpalt || !(skpend = skpto = skpstart)) ; else
 #define skpstart skp_loop.start
 
 #define skpto    skp_loop.to
@@ -209,6 +209,12 @@ static int is_alpha(uint32_t c)
 { return ('A' <= c && c <= 'Z')
       || ('a' <= c && c <= 'z'); }
 
+static int is_idchr(uint32_t c)
+{ return ('A' <= c && c <= 'Z')
+      || ('a' <= c && c <= 'z')
+      || ('0' <= c && c <= '9')
+      || (c == '_'); }
+
 static int is_alnum(uint32_t c)
 { return (is_alpha(c) || is_digit(c)); }
 
@@ -315,8 +321,6 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
   s_end = src;
   s_chr = skp_next(s_end, &s_tmp,*flg & 2);
 
-    while (is_space(*pat)) pat++;
-    
     if (*pat == '*') { match_min = 0;  match_max = UINT32_MAX; pat++; } 
     else if (*pat == '+') { match_max = UINT32_MAX; pat++; } 
     else if (*pat == '?') { match_min = 0; pat++; }
@@ -355,7 +359,9 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
       case 'w' : W(is_blank(s_chr));  break;
       case 'n' : W(is_break(s_chr));  break;
       case 'c' : W(is_ctrl(s_chr));   break;
+      case 'i' : W(is_idchr(s_chr));  break;
       
+      case '&' :
       case '@' : ret = match_not? MATCHED_GOALNOT : MATCHED_GOAL;
                  break;
 
@@ -542,7 +548,9 @@ int skp_(char *src, char *pat, char **to,char **end)
 
   p = pat;
   s = start;
+  while (is_space(*p)) p++;
   while (*p > '\7') {
+    
     if ((matched = match(p,s,&p_end,&s_end,&flg))) {
      _skptrace("matched( '%s' '%s'",s,p);
       s = s_end; p = p_end;
@@ -568,6 +576,7 @@ int skp_(char *src, char *pat, char **to,char **end)
       }
       else break;
     }
+    while (is_space(*p)) p++;
   }
 
  _skptrace("pat: '%s'",p);
