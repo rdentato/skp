@@ -46,7 +46,7 @@ skpdef(lookahead) {
 
 skpdef(retval) {
   skpmatch_("?'?'");
-  skpmaybe skpmatch_("D");
+  skpmaybe skpmatch_("D\1[xX]X");
 }
 
 skpdef(match) {
@@ -275,11 +275,14 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
       astifnodeis(lu_func) {
         rpt = 0;
         if (repeat) { prtrepeat(repeat, indent, src,nl); rpt++;}
-        fprintf(src,"%*sskplookup(%.*s) {%c",indent,skpemptystr,astcurlen,astcurfrom,nl);
+        fprintf(src,"%*sskplookup%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
+        fprintf(src,"(%.*s)",astcurlen,astcurfrom);
+        fprintf(src," {%c",nl);
         rpt++;
         indent += 2*rpt;
         push(rpt);
         repeat = '\0';
+        modifier = 0;
       }
 
       astifnodeis(lu_case) {
@@ -294,7 +297,12 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
           s++; indent+=2;
         }
         fprintf(src,"%*sastretval(",indent,skpemptystr);
-        if (astcurto>s) fprintf(src,"%d);%c",atoi(s),nl);
+        if (astcurto>s) {
+          int32_t n;
+          if (*s=='x' || *s == 'X') n = strtoul(s+1,NULL,16);
+          else n=strtoul(s,NULL,10);
+          fprintf(src,"%d);%c",n,nl);
+        }
         else fprintf(src,"astlastinfo);%c",nl);
         if (*astcurfrom == '?') {
           indent-=2;
