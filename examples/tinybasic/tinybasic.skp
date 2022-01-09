@@ -1,0 +1,179 @@
+{
+  #define TOK_END    0x11   
+  #define TOK_FOR    0x12  
+  #define TOK_GOSUB  0x13  
+  #define TOK_GOTO   0x14   
+  #define TOK_IF     0x15  
+  #define TOK_INPUT  0x16  
+  #define TOK_LET    0x17   
+  #define TOK_NEXT   0x18  
+  #define TOK_POKE   0x19 
+  #define TOK_PRINT  0x1A   
+  #define TOK_REM    0x1B   
+  #define TOK_RETURN 0x1C  
+
+  #define TOK_ABS    0x21
+  #define TOK_BAND   0x32
+  #define TOK_BOR    0x42
+  #define TOK_BXOR   0x52
+  #define TOK_BNOT   0x61
+  #define TOK_PEEK   0x71
+  #define TOK_RND    0x81
+
+  
+  static char *kwlist[] = {
+    "\x11""END",
+    "\x12""FOR",
+    "\x13""GOSUB",
+    "\x14""GOTO",
+    "\x15""IF",
+    "\x16""INPUT",
+    "\x17""LET",
+    "\x18""NEXT",
+    "\x19""POKE",
+    "\x1A""PRINT",
+    "\x1B""REM",
+    "\x1C""RETURN",
+    NULL
+  };
+
+  #define MAXKWLEN 6
+  static char kwbuf[MAXKWLEN+1];
+
+  skpfunc(keyword) {
+
+    int len = 0;
+    char *s = kwbuf;
+    int c;
+
+    // Get the candidate keyword
+    while (*skpcur && len <= MAXKWLEN) {
+      c = toupper(*skpcur);
+      if (c < 'A' || 'Z' < c ) break;
+      *s++ = c; len++; skpcur++;
+    }
+    *s = '\0';
+  
+    if (len <= MAXKWLEN) {
+      // Since there are very few keywords, a linear search will
+      // be good enough. Otherwise a binary search or, better, a
+      // perfect hash table could be more appropriate.
+      for (char **kl = kwlist; *kl; kl++) {
+        if (strcmp(kwbuf,(*kl)+1) == 0) {
+          return (*kl)[0];
+        }
+      }
+    }
+
+    skpcur = NULL;
+    return 0;
+  }
+}
+
+program = (_S_ _line)* _EOF_; 
+ 
+line = lnum? _stmt _EOL_ ;
+lnum = _"+d" ;
+
+stmt = __ _keyword[
+               TOK_PRINT  : __ _prtarg (_COMMA _prtarg)* ;
+               TOK_INPUT  : __  inask? invar (_COMMA invar)* ;
+               TOK_IF     : __  expr _THEN (cond_goto / cond_stmt) ;
+               TOK_GOTO   : __  goto_lnum ;
+               TOK_GOSUB  : __  gosub_lnum ;
+               TOK_FOR    : __ _for_stmt ;
+               TOK_NEXT   : __  next_stmt ;
+               TOK_END    : __  end_stmt ;
+               TOK_LET    : __  letvar _EQ <expr ;
+               TOK_RETURN : __  return_stmt ;
+               TOK_POKE   : __  expr _COMMA expr poke_stmt ;
+           ] ;
+
+return_stmt = _EMPTY_ ;
+next_stmt   = _EMPTY_ ;
+end_stmt    = _EMPTY_ ;
+poke_stmt   = _EMPTY_ ;
+
+prtarg = _prtexpr / prtstr ;
+prtexpr = expr prtval;
+prtstr = _"Q" ;
+prtval = _EMPTY_ ;
+
+inask = _"Q" ;
+invar = _VAR ;
+
+cond_goto = _lnum; 
+cond_stmt = _stmt;
+
+gosub_lnum = _lnum;
+goto_lnum  = _lnum;
+
+for_stmt  = for_var _EQ <expr _TO _for_to (_STEP _for_step)? ;
+for_var   = _VAR ;
+for_to    = expr for_limit;
+for_limit = _EMPTY_; 
+for_step  = expr for_incr;
+for_incr  = _EMPTY_; 
+
+letvar = _VAR ;
+
+expr      = _and ( OR <^^and )* ;
+and       = _equ ( AND <^^equ )* ;
+equ       = _comp ( EQ_OP <^^comp )* ;
+comp      = _term ( CMP_OP <^^term )* ;
+term      = _fact ( ADD_OP <^^fact )* ;
+fact      = _unary ( MULT_OP <^^unary )* ;
+unary     = UNARY_OP _<unary / _primary ;
+primary   = NUMBER   
+          / _OPN_PAREN expr _CLS_PAREN 
+          / {int nargs = 0;} 
+            func {? nargs = astcurnodeinfo & 0x0F; }
+            _OPN_PAREN
+            <fnargs    {? if (nargs != astlastinfo ) astfail;}
+            _CLS_PAREN 
+          / varval
+          ;
+
+varval = _VAR ;
+
+func = _"!C'ABS'  &W '('"  #?x21
+     / _"!C'BAND' &W '('"  #?x32
+     / _"!C'BOR'  &W '('"  #?x42
+     / _"!C'BXOR' &W '('"  #?x52
+     / _"!C'BNOT' &W '('"  #?x61
+     / _"!C'PEEK' &W '('"  #?x71
+     / _"!C'RND'  &W '('"  #?x81
+     ;
+
+fnargs = {int argn = 0; } 
+         (expr {? argn++; } (_COMMA expr {? argn++; })* / _$"" )
+         {? astretval(argn);}
+       ;
+
+AND         = __ _"!C 'and' !& i" __;
+OR          = __ _"!C 'or' !& i" __;
+
+ADD_OP      = __ _"'-'\1  '+'\2"  #? __;
+CMP_OP      = __ _"'<='\1 '>='\2  '<'\3  '>'\4" #? __;
+EQ_OP       = __ _"'='\1  '<>'\2" #? __;
+MULT_OP     = __ _"'/'\1  '*'\2"  #? __;
+UNARY_OP    = __ _"!C'not'!&i\1  '-'\2"  #? __;
+
+EQUAL       = __ _$"=" __;
+CLS_PAREN   = __ _$")" __;
+OPN_PAREN   = __ _$"(" __;
+
+VAR = _"a&![A-Za-z_(]" ;
+
+COMMA  = __ _$"," __;
+EQ     = __ _$"=" __;
+NUMBER =    _"D" ;
+STEP   = __ _"!C 'step'" __ ;
+THEN   = __ _"!C 'then'" __ ;
+TO     = __ _"!C 'to'" __ ;
+
+EMPTY_ =    _$"" ;
+EOF_   = __ _"S!." ;
+EOL_   = __ _"!C 'REM' *!n"? ( _"n" / _"!.") ;
+S_     =    (_"+s" / _"!C 'REM' N")* ;
+_      =    _"*w" ;
