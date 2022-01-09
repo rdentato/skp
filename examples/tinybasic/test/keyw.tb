@@ -1,0 +1,10 @@
+   REM TEST 1 
+   LET X = 3+4*2
+
+20 PRINT "this is " , X
+   INPUT a
+   for K = 7 to 3
+     IF 7<2 and (4>X or x=3) THEN 20
+     if 9 THEN PRINT 5
+   NEXT
+   END
