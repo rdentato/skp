@@ -77,10 +77,10 @@ Here is some example, the full list is below.
                    (spaces are meaningless)
     "d S 'cm'"     a digit followed by optional spaces and the string "`cm`"
     "d S ?'cm'"    a digit followed by optional spaces and an optional string "`cm`"
-    "d@ S 'cm'"    a digit followed by optional spaces and the string "`cm`"
-                   but will match only the digit! (`@` is a *positive lookahead*)
-    "d!@ S 'cm'"   a digit *not* followed optional spaces and the string "`cm`"
-                   will match only the digit! (`!@` is a *negative lookahead*)
+    "d& S 'cm'"    a digit followed by optional spaces and the string "`cm`"
+                   but will match only the digit! (`&` is a *positive lookahead*)
+    "d!& S 'cm'"   a digit *not* followed optional spaces and the string "`cm`"
+                   will match only the digit! (`!&` is a *negative lookahead*)
     "`'` I `'`"    An identifier between single quotes (backticks are used to 
                    avoid clashes with the quote.)
 ```
@@ -89,6 +89,7 @@ Here is some example, the full list is below.
    a  ASCII alphabetic char
    l  ASCII lower case
    u  ASCII upper case
+   i  identifier letter ([_0-9A-Za-z])
    d  decimal digit
    x  hex digit
    w  white space (includes some Unicode spaces)
@@ -121,10 +122,10 @@ Here is some example, the full list is below.
 
    !  negate
 
-   @  set goal
-   !@ set negative goal
+   &  positive lookahead
+   !& negative lookahead
 
-   [...] set
+   [...] set of caharcters (or range like `a-z`)
   
    .  (any non \0 character, UTF-8 or ISO)
    !. (end of text)
