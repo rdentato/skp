@@ -1,0 +1,9 @@
+   LET A = 8
+11 LET B = 2
+   GOTO 20
+   LET X = A+8*
+20 LET Y = 8 
+25 IF X >= 42 THEN 30
+     LET Y = X + B 
+     LET X = A
+30 END

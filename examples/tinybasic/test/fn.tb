@@ -1,2 +1,2 @@
-LET X = ABS(2)
+LET X = -ABS(P)
 LET Y = bAND(32,55)

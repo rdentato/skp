@@ -1,4 +1,6 @@
-   REM Test for a TinyBasic Compiler (to C)
+   LET X = ABS(X)
+   LET Y = - not (X and T)
+   REM Test for a TinyBasic interpreter (tree walk)
 10 PRINT "HELLO WORLD!", K
    LET K = K+1
    GOTO 10

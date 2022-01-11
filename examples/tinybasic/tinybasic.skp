@@ -1,4 +1,5 @@
 {
+  #define TOK_DATA   0x10   
   #define TOK_END    0x11   
   #define TOK_FOR    0x12  
   #define TOK_GOSUB  0x13  
@@ -22,6 +23,7 @@
 
   
   static char *kwlist[] = {
+    "\x10""DATA",
     "\x11""END",
     "\x12""FOR",
     "\x13""GOSUB",
@@ -68,25 +70,44 @@
     skpcur = NULL;
     return 0;
   }
+
+static char *err_lnnum   = "Invalid line number";
+static char *err_args    = "Invalid argument list";
+static char *err_expr    = "Invalid expression";
+static char *err_syntax  = "Syntax error";
+static char *err_nolnnum = "Missing line number";
+static char *err_novar   = "Invalid variable";
+static char *err_FOR     = "Invalid FOR statement";
+static char *err_no_NEXT = "Missing NEXT to close a FOR loop";
+static char *err_NEXT    = "NEXT outside a FOR loop";
+int for_nestlevel = 0;
+
 }
 
-program = (_S_ _line)* _EOF_; 
- 
-line = lnum? _stmt _EOL_ ;
-lnum = _"+d" ;
+program = (_S_ _line)* _EOF_ {if (for_nestlevel > 0) astabort(err_no_NEXT); } ; 
 
-stmt = __ _keyword[
-               TOK_PRINT  : __ _prtarg (_COMMA _prtarg)* ;
-               TOK_INPUT  : __  inask? invar (_COMMA invar)* ;
-               TOK_IF     : __  expr _THEN (cond_goto / cond_stmt) ;
-               TOK_GOTO   : __  goto_lnum ;
-               TOK_GOSUB  : __  gosub_lnum ;
-               TOK_FOR    : __ _for_stmt ;
-               TOK_NEXT   : __  next_stmt ;
-               TOK_END    : __  end_stmt ;
-               TOK_LET    : __  letvar _EQ <expr ;
-               TOK_RETURN : __  return_stmt ;
-               TOK_POKE   : __  expr _COMMA expr poke_stmt ;
+line = lnnum? _stmt _EOL_ ;
+
+{ int32_t maxlnum = -1; } 
+
+lnnum = _"+d" {? int32_t lnum = atoi(astprevptr);
+                 if (lnum > 0 && lnum < maxlnum) {astabort(err_lnnum); }
+                 else {maxlnum = lnum; astretval(lnum); }
+              } ;
+
+stmt = __ @>"Unknown statement"
+          _keyword[
+               TOK_PRINT  : __ ( _prtarg ( _COMMA _prtarg)* )? _nl_ <@err_args ;
+               TOK_INPUT  : __ (inask _COMMA)? invar (_COMMA invar)* _nl_ <@err_args ;
+               TOK_IF     : __ @>err_expr  expr _THEN (cond_goto / cond_stmt) _nl_ <@"Invalid THEN" ;
+               TOK_GOTO   : __ goto_line _nl_;
+               TOK_GOSUB  : __ gosub_line _nl_;
+               TOK_FOR    : __ @>err_FOR _for_stmt {? for_nestlevel++;} _nl_;
+               TOK_NEXT   : __ next_stmt {? for_nestlevel--; if (for_nestlevel < 0) astabort(err_NEXT);} _nl_;
+               TOK_END    : __ end_stmt _nl_;
+               TOK_LET    : __ letvar _EQ @>err_expr <expr _nl_;
+               TOK_RETURN : __ return_stmt _nl_;
+               TOK_POKE   : __ @>err_args expr _COMMA expr poke_stmt _nl_;
            ] ;
 
 return_stmt = _EMPTY_ ;
@@ -100,22 +121,22 @@ prtstr = _"Q" ;
 prtval = _EMPTY_ ;
 
 inask = _"Q" ;
-invar = _VAR ;
+invar = _VAR #? ;
 
-cond_goto = _lnum; 
-cond_stmt = _stmt;
+goto_line  = @>err_nolnnum _"+d" {? astretval(atoi(astprevptr)); } ;
+gosub_line = _goto_line # ;
+cond_goto  = _goto_line # ; 
+cond_stmt  = _stmt;
 
-gosub_lnum = _lnum;
-goto_lnum  = _lnum;
 
-for_stmt  = for_var _EQ <expr _TO _for_to (_STEP _for_step)? ;
-for_var   = _VAR ;
-for_to    = expr for_limit;
+for_stmt  = for_var _EQ @>err_expr <expr  _TO _for_to (_STEP _for_step)? ;
+for_var   = _VAR <@err_novar #? ;
+for_to    = expr <@err_expr for_limit;
 for_limit = _EMPTY_; 
-for_step  = expr for_incr;
+for_step  = expr <@err_expr for_incr;
 for_incr  = _EMPTY_; 
 
-letvar = _VAR ;
+letvar = _VAR <@err_novar #? ;
 
 expr      = _and ( OR <^^and )* ;
 and       = _equ ( AND <^^equ )* ;
@@ -123,18 +144,21 @@ equ       = _comp ( EQ_OP <^^comp )* ;
 comp      = _term ( CMP_OP <^^term )* ;
 term      = _fact ( ADD_OP <^^fact )* ;
 fact      = _unary ( MULT_OP <^^unary )* ;
-unary     = UNARY_OP _<unary / _primary ;
+unary     = UNARY_OP <^^unary / _primary ;
 primary   = NUMBER   
           / _OPN_PAREN expr _CLS_PAREN 
-          / {int nargs = 0;} 
-            func {? nargs = astcurnodeinfo & 0x0F; }
-            _OPN_PAREN
-            <fnargs    {? if (nargs != astlastinfo ) astfail;}
-            _CLS_PAREN 
+          / fcall
           / varval
           ;
 
-varval = _VAR ;
+fcall = {int nargs = 0;} 
+        func {? nargs = astcurnodeinfo & 0x0F; }
+        _OPN_PAREN
+        <fnargs    {? if (nargs != astlastinfo ) astfail;}
+        _CLS_PAREN 
+      ;
+
+varval = _VAR #?;
 
 func = _"!C'ABS'  &W '('"  #?x21
      / _"!C'BAND' &W '('"  #?x32
@@ -147,7 +171,7 @@ func = _"!C'ABS'  &W '('"  #?x21
 
 fnargs = {int argn = 0; } 
          (expr {? argn++; } (_COMMA expr {? argn++; })* / _$"" )
-         {? astretval(argn);}
+         #?=argn
        ;
 
 AND         = __ _"!C 'and' !& i" __;
@@ -163,11 +187,11 @@ EQUAL       = __ _$"=" __;
 CLS_PAREN   = __ _$")" __;
 OPN_PAREN   = __ _$"(" __;
 
-VAR = _"a&![A-Za-z_(]" ;
+VAR = (_"a!." / _"a&![A-Za-z_(]") {? astretval(toupper(*astprevptr)-'A'); };
 
 COMMA  = __ _$"," __;
 EQ     = __ _$"=" __;
-NUMBER =    _"D" ;
+NUMBER =    _"D" {? astretval(atoi(astprevptr)); } ;
 STEP   = __ _"!C 'step'" __ ;
 THEN   = __ _"!C 'then'" __ ;
 TO     = __ _"!C 'to'" __ ;
@@ -177,3 +201,4 @@ EOF_   = __ _"S!." ;
 EOL_   = __ _"!C 'REM' *!n"? ( _"n" / _"!.") ;
 S_     =    (_"+s" / _"!C 'REM' N")* ;
 _      =    _"*w" ;
+nl_    =    (_"+w" / _"!C 'REM' *!n")* "&n" <@"Expected end of line";
