@@ -35,18 +35,26 @@ skpdef(seq) {
   skpmany{ skprule_(spc_); 
                  skprule(incode);
            skpor { skpmatch_("'#'"); skprule(retval); }
+           skpor { skpmatch_("'<@'"); skprule(abort); }
+           skpor { skpmatch_("'@'?'>'"); skprule(errmsg); }
            skpor { skpmaybe { skprule(lookahead);} skprule_(match); }
            skpor skprule_(match); 
          }
 }
 
-skpdef(lookahead) {
-  skpmatch_("[!&]\4");
-}
+skpdef(errmsg) { skponce { skpmatch_("&'\"'"); skpmatch_("Q"); }
+                   skpor { skpmatch_("I"); }
+               }
+
+skpdef(abort) { skponce { skpmatch_("&'\"'"); skpmatch_("Q"); }
+                skpor { skpmatch_("I"); }
+              }
+
+skpdef(lookahead) { skpmatch_("[!&]\4"); }
 
 skpdef(retval) {
   skpmatch_("?'?'");
-  skpmaybe skpmatch_("D\1[xX]X");
+  skpmaybe skpmatch_("D\1[xX]X\1'='I");
 }
 
 skpdef(match) {
@@ -69,7 +77,7 @@ skpdef(match_term) {
             skprule(alt); astliftall;
             skprule_(spc_); skpstring_(")");
           }
-    skpor { skpstring_("#"); skpmatch("D"); /*skptrace("INFO: %d %d",astfailed, *astcurfrom);*/ }
+    // skpor { skpstring_("#"); skpmatch("D"); /*skptrace("INFO: %d %d",astfailed, *astcurfrom);*/ }
 }
 
 skpdef(ruleref)  { skpmatch_("I !@ S ':'"); }
@@ -299,15 +307,31 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         fprintf(src,"%*sastretval(",indent,skpemptystr);
         if (astcurto>s) {
           int32_t n;
-          if (*s=='x' || *s == 'X') n = strtoul(s+1,NULL,16);
-          else n=strtoul(s,NULL,10);
-          fprintf(src,"%d);%c",n,nl);
+          if (*s=='=') {
+            while (++s<astcurto) {
+              fputc(*s,src);
+            }
+          }
+          else { 
+             if (*s=='x' || *s == 'X') n = strtoul(s+1,NULL,16);
+             else n=strtoul(s,NULL,10);
+             fprintf(src,"%d",n);
+          }
+          fprintf(src,");%c",nl);
         }
         else fprintf(src,"astlastinfo);%c",nl);
         if (*astcurfrom == '?') {
           indent-=2;
           fprintf(src,"%*s}%c",indent,skpemptystr,nl);
         }
+      }
+
+      astifnodeis(errmsg) {
+        fprintf(src,"%*sif (!astfailed) { skpseterrmsg(%.*s); }%c",indent,skpemptystr,astcurlen, astcurfrom,nl);
+      }
+
+      astifnodeis(abort) {
+        fprintf(src,"%*sif (astfailed) { skpabort(%.*s); }%c",indent,skpemptystr,astcurlen, astcurfrom,nl);
       }
 
       astifnodeis(alt) {
@@ -342,7 +366,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         if (*start == '?') {
           fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
         }
-        else fprintf(src,"%.*s",len,start);
+        else fprintf(src,"%.*s\n",len,start);
       }
 
       astifnodeis(incode) {
@@ -356,7 +380,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         if (start != astcurfrom+1) {
           fprintf(src,"}");
         }
-        fprintf(src,"%c",nl);
+        fprintf(src,"\n");
       }
     }
     astifexit {
