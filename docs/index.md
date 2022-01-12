@@ -2,6 +2,7 @@
 
 Skp is a library of functions to help parsing text files.
 
+
 Rather than answering the question "which portion of the text match the pattern?", skp
 answer to the question "which portion of the text can be skipped to match the pattern?".
 The difference is subtle but is there.
@@ -21,23 +22,32 @@ Skp can be used at three increasing levels of complexity:
 ## Level 1: Skipping
 
 ### Basic skipping
+
 The basic function for skipping text is:
-```
-  int skp(char *text, char *pattern)
-```
 
-It returns 0 if the begininng of the text can't be skipped according to the given pattern.
-
-
-A slightly more useful usage of the skp() function is the following:
-
-```
-  int skp(char *text, char *pattern, char **to)
+``` C
+  int skp(char *start, char *pattern, char **to)
 ```
 
-the `to` variables will point right after the skipped text. For example:
+  If the text at `start` matches the pattern, `skp` will return `1` and the `to`
+variable will point right after the skipped text as shown in the picture below. 
 
 ```
+        ╭─text that matches─╮
+        │    the pattern    │
+     ───┬───┬───┬───┬───┬───┬───┬───┬───
+    ●●● │▒▒▒│▒▒▒│▒▒▒│▒▒▒│▒▒▒│   │   │ ●●●  
+     ───┴───┴───┴───┴───┴───┴───┴───┴───
+          ▲                   ▲
+          ╰start              ╰to
+
+```
+
+  If there is no match, `skp` will return `0` and `to` will be set to `start`.
+
+  For example: 
+
+``` C
   char *txt = "Hello World";
   char *to;
 
@@ -49,9 +59,25 @@ the `to` variables will point right after the skipped text. For example:
   
 ```
 
+  Sometimes you just want to know if the text at `start` matches a certain pattern
+or not. You can pass `NULL` as the value for `to` or use a simpler version of `skp()`:
+
+``` C
+  int skp(char *start, char *pattern)
+```
+
+  The following two lines are equivalent:
+
+``` C
+  skp(mytext, mypattern, NULL);
+  skp(mytext, mypattern);
+```
+
+
+
 ### Patterns
 
-Special match patterns are introduced by the `&` character.
+
 
 ```
    a  ASCII alphabetic char
@@ -62,7 +88,8 @@ Special match patterns are introduced by the `&` character.
    w  white space (includes some Unicode spaces)
    s  white space and vertical spaces (e.g. LF)
    c  control
-   n  newline
+   i  identifier character
+   n  a newline (`\n`, `\r` or `\r\n`)
 
    
    ' " or ` a literal string (useful for optional and negatives)
@@ -84,29 +111,30 @@ Special match patterns are introduced by the `&` character.
 
    !  negate
 
-   @  set goal
-   !@ set negative goal
+   &  set goal
+   !& set negative goal
 
    [...] set
   
-   .  (any non \0 character, UTF-8 or ISO)
-   !. (end of text)
+   .  (any non \0 character, UTF-8 or ISO encoded)
+   !. (the \0 character, i.e. the end of text)
 
    >  skip to the start of pattern (skip to)
 
    & the character '&'
 
    \1 ... \7  alternatives
+   \xE string alternatives
 ```
 
 Examples:
 
-```
-   skp(cur,"&*s",&cur); // skip spaces (if any)
-   skp(start,"|&*![|]|",&end); // skip text enclosed in '|'
-   skp(text,"&!Cfoo",&to); // skips "foo", "FoO", "fOo", etc.
+``` C
+   skp(cur,"*s", &cur);              // skip spaces (if any)
+   skp(start,"'|' *!'|' '|'", &end); // skip text enclosed in '|'
+   skp(text,"!C'foo'", &to);         // skips "foo", "FoO", "fOo", etc.
 
-   alt = skp(text,"&D\1&I\2"); // returns 1 if it's an integer number
+   alt = skp(text,"D\1I\2");   // returns 1 if it's an integer number
                                //         2 if it's an identifier
                                //         0 None of the above
 ```
@@ -116,24 +144,42 @@ Examples:
 Sometimes you want to skip ahead until you match a specified pattern:
 
 ```
-   skp(text,"&>&D",&num); // Set num to the the beginning of next number
+              ╭─text that matches─╮
+              │    the pattern    │
+   ───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───
+  ●●● │   │   │▒▒▒│▒▒▒│▒▒▒│▒▒▒│▒▒▒│   │   │ ●●●  
+   ───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───
+        ▲       ▲                   ▲  
+        ╰start  ╰to                 ╰end
 ```
 
-To avoid calling `skp` againg you can use another form of the function:
+For example, you want to skip everything until you find an integer number.
+To achieve this result, you can place a `>` before your pattern like
+in this example:
 
-```
-  int skp(char *text, char *pattern, char** to, char **end)
+``` C
+   skp(text,">D",&num); // Set num to the the beginning of next number
 ```
 
-For example:
-```
-   char *text="a b c 123 d e";
-   char *start, *end;
+To avoid calling `skp` again to reach the end of the text that matches
+the pattern, you can use another form of the `skp` function:
 
-   skp(text,"&>&D",&start,&end);
+``` C
+  int skp(char *start, char *pattern, char** to, char **end)
+```
+
+Here is a full example:
+
+``` C
+   char *text = "a b c 123 d e";
+   char *to, *end;
+
+   skp(text, ">D", &to, &end);
+
    // a b c 123 d e
-   //       ^  ^____ end
-   //       |_______ start
+   //       ▲  ▲
+   //       │  ╰── end
+   //       ╰─────── start
 
 ```
 
@@ -143,12 +189,12 @@ Sometimes, however, is more useful to continously match a block of text.
 
 There is a form of the skp function that does this:
 
-```
+``` C
     skp(char *text) { ... }
 ```
 
 Within the code guarded by skp
-```
+``` 
     skpif(char *pattern) { ... }  execute the code block if text match the pattern
     skpelse { } execute the code if nothing matches
 
