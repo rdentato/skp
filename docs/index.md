@@ -18,6 +18,119 @@ Skp can be used at three increasing levels of complexity:
   - *Scanning*, where a text is repeatedly checked against a set of patterns;
   - *Parsing*, where a Parsing Expression Grammar can be directly coded as a recursive descent parser.
 
+
+## Patterns
+To match strings, `skp` uses *patterns*. 
+A *pattern* is a sequence of *recognizers* possibly separated by spaces.
+For example `"d ?'cm'"` matches a digit followed by an optional `cm` string.
+
+Each recognizer has three parts:
+
+```  
+     *!u
+     ^^^
+     |||
+     \\\___ Recognizer
+      \\___ Negate (optional)
+       \___ Repeat (optional, can be '*', '?' or '+')
+```
+Note that not all modifiers are meaningful for all recognizer.
+
+Here are some examples, next sections will detail the different types
+of recognizers
+```
+    "d"            a single decimal digit
+    "dd"           two digits
+    "+d"           one or more digits
+    "?d"           an optional digit
+    "dl"           a digit follwed by a lower case ASCII letter
+    "d l"          a digit follwed by a lower case ASCII letter
+                   (spaces are meaningless)
+    "d S 'cm'"     a digit followed by optional spaces and the string "`cm`"
+    "d S ?'cm'"    a digit followed by optional spaces and an optional string "`cm`"
+    "d& S 'cm'"    a digit followed by optional spaces and the string "`cm`"
+                   but will match only the digit! (`&` is a *positive lookahead*)
+    "d!& S 'cm'"   a digit *not* followed by optional spaces and the string "`cm`"
+                   will match only the digit! (`!&` is a *negative lookahead*)
+    "`'` I `'`"    An identifier between single quotes (backticks are used to 
+                   avoid clashes with the quote.)
+```
+
+### Characters
+
+Since `skp` is aimed at parsing *technical* files (programs source code, data
+files, etc..) we have restricted the concept of *letters* and *digit* to the
+ones encoded in ASCII.
+
+```
+   .      any non \0 character
+   a      ASCII alphabetic char
+   l      ASCII lower case
+   u      ASCII upper case
+   [...]  set (e.g.: [a-zα-ω] for a lowercase Latin or Greek letter); if ']' 
+          or '-' are part of the set, they must be the first or the last
+          element in the set.
+```
+
+### Numbers
+
+These recognizers are useful when working with numbers:
+
+```
+   d  ASCII decimal digit
+   x  hex digit
+   D  integer decimal number (possibly signed)
+   F  floating point number (possibly with sign and exponent)
+   X  hex number (possibly with leading 0x)
+```
+
+### Spaces
+
+```
+   w  white space (includes some Unicode spaces)
+   s  white space and vertical spaces (e.g. LF)
+   c  control character (C0 and C1 Unicode blocks)
+   n  a newline (`\n`, `\r` or `\r\n`)
+   $  end of line (newline or end of text)
+   !. (the \0 character, i.e. the end of text)
+```
+
+### Identifiers
+
+```
+   i  identifier character
+   I  Identifier ([_A-Za-z][_0-9A-Za-z]*)
+```
+
+### Strings
+
+```
+   ' " or ` a literal string (useful for optional and negatives)
+   Q  Quoted string with '\' as escape
+   B  Balanced sequence of parenthesis (can be '()''[]''{}')
+   () Balanced parenthesis (only '()')
+   N  Anything up to the end of line
+```
+
+```
+   C  case sensitive (ASCII) comparison
+   U  utf-8 encoding (or ASCII/ISO-8859)
+   >  skip to the start of pattern (skip to)
+
+   *  zero or more match
+   ?  zero or one match
+   +  one or more match
+
+   !  negate
+
+   &  set goal
+   !& set negative goal
+
+
+   \1 ... \7  alternatives
+   \xE string alternatives
+```
+
 ## Level 1: Skipping
 
 ### Basic skipping
@@ -71,73 +184,6 @@ or not. You can pass `NULL` as the value for `to` or use a simpler version of `s
   skp(mytext, mypattern, NULL);
   skp(mytext, mypattern);
 ```
-
-### Patterns
-
-A *pattern* is a sequence of *recognizers* possibly separated by spaces.
-For example `"d ?'cm'"` matches a digit followed by an optional `cm` string.
-
-#### ASCII characters
-
-Since `skp` is aimed at parsing *techincal* files (programs source code, data
-files, etc..) we have restricted the concept of *letters* and *digit* to the
-ones encoded in ASCII:
-
-```
-   a  ASCII alphabetic char
-   l  ASCII lower case
-   u  ASCII upper case
-   d  ASCII decimal digit
-```
-
-```
-   x  hex digit
-```
-
-```
-   w  white space (includes some Unicode spaces)
-   s  white space and vertical spaces (e.g. LF)
-   c  control
-   i  identifier character
-   n  a newline (`\n`, `\r` or `\r\n`)
-```
-  
-```
-   ' " or ` a literal string (useful for optional and negatives)
-   Q  Quoted string with '\' as escape
-   B  Balanced sequence of parenthesis (can be '()''[]''{}')
-   () Balanced parenthesis (only '()')
-   I  Identifier ([_A-Za-z][_0-9A-Za-z]*)
-   N  Up to the end of line
-   D  integer decimal number (possibly signed)
-   F  floating point number (possibly with sign and exponent)
-   X  hex number (possibly with leading 0x)
-
-   C  case sensitive (ASCII) comparison
-   U  utf-8 encoding (or ASCII/ISO-8859)
-
-   *  zero or more match
-   ?  zero or one match
-   +  one or more match
-
-   !  negate
-
-   &  set goal
-   !& set negative goal
-
-   [...] set
-  
-   .  (any non \0 character, UTF-8 or ISO encoded)
-   !. (the \0 character, i.e. the end of text)
-
-   >  skip to the start of pattern (skip to)
-
-   & the character '&'
-
-   \1 ... \7  alternatives
-   \xE string alternatives
-```
-
 Examples:
 
 ``` C
@@ -399,8 +445,8 @@ in the previos section, will return this AST:
    [term]     [op]                   [term]
       │         │        ╭─────────────┼─────────────────╮
    [$ (1)]   [$ (2)]  [$ (1)]        [expr]           [$ (1)]
-      │         │        │      ╭──────┴─┬─────────╮      │
-     '2'       '+'      '('  [term]    [op]     [term]   ')'
+      │         │        │      ╭──────┴─┬─────────╮     │
+     '2'       '+'      '('  [term]    [op]     [term]  ')'
                                 │        │         │ 
                              [$ (1)]  [$ (3)]   [$ (1)]
                                 │        │         │ 
