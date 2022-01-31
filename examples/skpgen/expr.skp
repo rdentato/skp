@@ -2,8 +2,8 @@
 
 { 
   //         Precedence ──┬╮
-  //      Right Assoc     ││
-  //        (0x8000)      ││
+  //  Right Associative   ││
+  //  starts with 0x8000  ││
   //                      ▼▼
   #define TOK_LOGIC_OR  0x0101
   #define TOK_LOGIC_AND 0x0201

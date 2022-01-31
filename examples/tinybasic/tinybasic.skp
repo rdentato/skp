@@ -99,7 +99,7 @@ stmt = __ @>"Unknown statement"
           _keyword[
                TOK_PRINT  : __ ( _prtarg ( _COMMA _prtarg)* )? _nl_ <@err_args ;
                TOK_INPUT  : __ (inask _COMMA)? invar (_COMMA invar)* _nl_ <@err_args ;
-               TOK_IF     : __ @>err_expr  expr _THEN (cond_goto / cond_stmt) _nl_ <@"Invalid THEN" ;
+               TOK_IF     : __ expr _THEN <@err_expr (cond_goto / cond_stmt) _nl_ <@"Invalid THEN" ;
                TOK_GOTO   : __ goto_line _nl_;
                TOK_GOSUB  : __ gosub_line _nl_;
                TOK_FOR    : __ @>err_FOR _for_stmt {? for_nestlevel++;} _nl_;

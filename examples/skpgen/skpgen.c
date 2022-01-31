@@ -183,18 +183,18 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
   char *line_pos = NULL ;
 
   astvisit(ast) {
-    astifentry {
-       astifnodeis(grammar) {
+    astonentry {
+       astcase(grammar) {
         fprintf(src,"#include \"skp.h\"\n");
         line_pos = astcurfrom;
        _skptrace("LN0: (%p) '%.4s",(void*)line_pos,line_pos);
       }
 
-      astifnodeis(ruledef) {
+      astcase(ruledef) {
         if (nl == '\n') prtruledef(astcurfrom, astcurlen, src);
       }
 
-      astifnodeis(rulename) {
+      astcase(rulename) {
         // count the number of nl and add them to line
         while (line_pos < astcurfrom) {
          _skptrace("LN1: (%p) (%p) '%.4s",(void*)astcurfrom,(void*)line_pos,line_pos);
@@ -216,7 +216,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
       // _  flat (don't build node)
       // _? flat (don't buoild node) if leaf 
       // _! flat if empty match
-      astifnodeis(modifier) {
+      astcase(modifier) {
         modifier = 0;
         for (char *c = astcurfrom; c<astcurto; c++) {
           switch (*c) {
@@ -236,11 +236,11 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         }
       }
 
-      astifnodeis(repeat) { 
+      astcase(repeat) { 
         repeat = *astcurfrom;
       }
 
-      astifnodeis(ruleref) {
+      astcase(ruleref) {
         if (repeat) { prtrepeat(repeat,indent,src,nl); indent+=2; }
         fprintf(src,"%*.sskprule%s", indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
         fprintf(src,"(%.*s);", astcurlen, astcurfrom);
@@ -251,7 +251,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         modifier = 0;
       }
 
-      astifnodeis(pattern) { 
+      astcase(pattern) { 
         if (repeat) { prtrepeat(repeat,indent,src, nl); indent+=2; }
         if (astcurnodeinfo == 1) {
           fprintf(src,"%*sskpstring%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
@@ -269,7 +269,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         modifier = 0;
       }
 
-      astifnodeis(chkfun) { 
+      astcase(chkfun) { 
         if (repeat) { prtrepeat(repeat,indent,src,nl); indent+=2; }
         fprintf(src,"%*sskpcheck%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
         fprintf(src,"(%.*s);",astcurlen,astcurfrom);
@@ -280,7 +280,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         modifier = 0;
       }
 
-      astifnodeis(lu_func) {
+      astcase(lu_func) {
         rpt = 0;
         if (repeat) { prtrepeat(repeat, indent, src,nl); rpt++;}
         fprintf(src,"%*sskplookup%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
@@ -293,12 +293,12 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         modifier = 0;
       }
 
-      astifnodeis(lu_case) {
+      astcase(lu_case) {
         fprintf(src,"%*scase %.*s:%c",indent,skpemptystr,astcurlen,astcurfrom,nl);
         indent +=4;
       }
       
-      astifnodeis(retval) {
+      astcase(retval) {
         char *s=astcurfrom;
         if (*astcurfrom == '?') {
           fprintf(src,"%*sif (!astfailed) {%c",indent,skpemptystr,nl);
@@ -326,15 +326,15 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         }
       }
 
-      astifnodeis(errmsg) {
+      astcase(errmsg) {
         fprintf(src,"%*sif (!astfailed) { skpseterrmsg(%.*s); }%c",indent,skpemptystr,astcurlen, astcurfrom,nl);
       }
 
-      astifnodeis(abort) {
+      astcase(abort) {
         fprintf(src,"%*sif (astfailed) { skpabort(%.*s); }%c",indent,skpemptystr,astcurlen, astcurfrom,nl);
       }
 
-      astifnodeis(alt) {
+      astcase(alt) {
         rpt = 1;
         if (repeat) { prtrepeat(repeat, indent, src,nl); }
         else fprintf(src,"%*sskpgroup {%c",indent,skpemptystr,nl);
@@ -343,7 +343,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         repeat = '\0';
       }
 
-      astifnodeis(alt_once) {
+      astcase(alt_once) {
         rpt = 0;
         if (repeat) { prtrepeat(repeat, indent, src,nl); rpt++;}
         if (astnodeis(ast,astright(astcur,astcurnode),alt_or)) {
@@ -355,13 +355,13 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         repeat = '\0';
       }
 
-      astifnodeis(alt_or) {
+      astcase(alt_or) {
         fprintf(src,"%*sskpor {%c",indent,skpemptystr,nl); indent+=2;
         push(1);
         repeat = '\0';
       }
 
-      astifnodeis(code) {
+      astcase(code) {
         char *start = astcurfrom+1; int len = astcurlen-2;
         if (*start == '?') {
           fprintf(src,"if (!astfailed) {\n%.*s\n}\n",len-1,start+1);
@@ -369,7 +369,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         else fprintf(src,"%.*s\n",len,start);
       }
 
-      astifnodeis(incode) {
+      astcase(incode) {
         char *start = astcurfrom+1; int len = astcurlen-2;
         fprintf(src,"%*s",indent,skpemptystr);
         if (*start == '?') {
@@ -383,17 +383,17 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         fprintf(src,"\n");
       }
     }
-    astifexit {
-      astifnodeis(ruledef) {
+    astonexit {
+      astcase(ruledef) {
         fprintf(src,"}\n");
       }
 
-      astifnodeis(alt_or, alt_once, alt, lookup) {
+      astcase(alt_or, alt_once, alt, lookup) {
         rpt = pop();
         while (rpt-- > 0) {indent -=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
       }
 
-      astifnodeis(alt_case) {
+      astcase(alt_case) {
         fprintf(src,"%*sbreak;%c",indent,skpemptystr,nl);
         indent -=4;
       }
