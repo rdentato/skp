@@ -1,5 +1,10 @@
 # skp
-![Join Discord channel](https://github.com/rdentato/skp/blob/master/docs/Discord_button.jpg?raw=true)
+![Join Discord channel]()
+
+<p>
+  <a href="https://discord.gg/vPgsxHcgXX"><img src="https://github.com/rdentato/skp/blob/master/docs/Discord_button.jpg?raw=true" title="Join Discord Channel"></a>
+</p>
+
 Skp is a library of functions to help parsing text files.
 
 It offers three *levels*:
