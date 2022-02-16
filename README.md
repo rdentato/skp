@@ -1,7 +1,7 @@
 # skp
 <p width="100%" style="align:center">
 <img height="150" src="https://raw.githubusercontent.com/rdentato/skp/master/docs/oval_logo_small.png"> <br/>
-  <a href="https://discord.gg/vPgsxHcgXX"><img src="https://github.com/rdentato/skp/blob/master/docs/Discord_button.jpg?raw=true" title="Join Discord Channel"></a>
+ 
 </p>
 
 Skp is a library of functions to help parsing text files.
@@ -17,4 +17,4 @@ Being the focus on parsing programming languages and data files, the character c
 Other clasess can be specified explicitly. For example you can match an hiragana character
 with `[ぁ-ゖ]`.
 
-For further information have a look at the [documentation](https://rdentato.github.io/skp/). 
+For further information have a look at the [documentation](https://rdentato.github.io/skp/) or join the Discord channel  <a href="https://discord.gg/vPgsxHcgXX"><img src="https://github.com/rdentato/skp/blob/master/docs/Discord_button.jpg?raw=true" title="Join Discord Channel"></a>. 
