@@ -660,6 +660,7 @@ represent the distance between the open parenthesis and its closing one.
   n is the delta between open and close parenthesis.
 ```
 */
+typedef int32_t astnode_t;
 
 typedef struct ast_node_s {
   char   *rule;
@@ -983,8 +984,6 @@ typedef struct {
 
 void skp_memoize(ast_t ast, ast_mmz_t *mmz,char *rule, int32_t old_pos, int32_t start_par);
 int skp_dememoize(ast_t ast, ast_mmz_t *mmz, char *rule);
-
-typedef int32_t astnode_t;
 
 // #define astinfo(n) astnewinfo(astcur,n)
 #define astsetinfo(...)     skp_vrg(ast_setinfo,__VA_ARGS__)

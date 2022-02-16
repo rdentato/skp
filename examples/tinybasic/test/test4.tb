@@ -1,7 +1,2 @@
-if x THEN PRINT 3+4
-
-FOR K = 5 TO 10
-  PRINT "HELLO WORLD", K 
-NEXT
-LET X = K
-END 
+if X >= 0 THEN 
+            PRINT 3+4

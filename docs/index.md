@@ -357,6 +357,8 @@ uaing the function:
    skpcheck(f)            call a C function
 ```
 
+ 
+
  Terminals and non-terminals can be grouped using the following functions:
 
  ```
@@ -394,9 +396,9 @@ skpdef(expr) {
 // term = INTEGER / '(' expr ')' / '-' term
 skpdef(term) {
   skponce { skpmatch("D"); }
-    skpor { skpstring("(");
+    skpor { skpstring("(",7);
             skprule(expr);
-            skpstring(")");
+            skpstring(")",7);
           }
     skpor { skpstring("-",4);
             skprule(term);
@@ -426,7 +428,7 @@ in the previos section, will return this AST:
     [op]
         [$ (2)] '+'
     [term]
-        [$ (1)] '('
+        [$ (7)] '('
         [expr]
             [term]
                 [$ (1)] '4'
@@ -434,7 +436,7 @@ in the previos section, will return this AST:
                 [$ (3)] '-'
             [term]
                 [$ (1)] '3'
-        [$ (1)] ')'
+        [$ (7)] ')'
 ```
 
   The one above is a linearization of the following tree:
@@ -444,7 +446,7 @@ in the previos section, will return this AST:
       ╭─────────┬────────┴─────────────╮
    [term]     [op]                   [term]
       │         │        ╭─────────────┼─────────────────╮
-   [$ (1)]   [$ (2)]  [$ (1)]        [expr]           [$ (1)]
+   [$ (1)]   [$ (2)]  [$ (7)]        [expr]           [$ (7)]
       │         │        │      ╭──────┴─┬─────────╮     │
      '2'       '+'      '('  [term]    [op]     [term]  ')'
                                 │        │         │ 
@@ -455,7 +457,16 @@ in the previos section, will return this AST:
 
   The full tree usually contains nodes that are not relevant for the next 
 processing steps, the section on AST *modifiers* will explain how to prune
-the tree so that it is better suited at being processed.
+the tree so that it is better suited for being processed.
+
+  Functions that match a terminal or non-terminal will add a node to the
+AST with the following information:
+   - rule: the name of the rule that matched (`_STRING` for `skpmatch()`
+     and `skpstring()`)
+   - from: pointer to the start of the matching text
+   - to: pointer to the end of the matching text
+   - len: length of the matching text
+   - tag: a numeric tag associated to the node
 
   Note that some nodes are *tagged* with an integer. Tagging a node can
 help during the AST traversal and avoid extra work. In the example 
@@ -463,7 +474,7 @@ above, the two strings below the `op` nodes, are tagged with `(1)` for
 the `+` operation and with `(2)` for `-`.
 
 ### Visiting the AST depth-first
-  A very common traversing order for AST is the *depth-first* one in which
+  A very common traversing order for AST is *depth-first* where
 all children of a node are visited before visiting its siblings.
 
 ```
@@ -479,22 +490,65 @@ visited during a depth-first traversal.
 
   You can perform actions (i.e. execute code) when *entering* a node
 (i.e. before visiting any of its children) and/or when *exiting* a node
-(i.e. after having visited all of its children). This correspond, respectively,
+(i.e. after having visited all its children). This correspond, respectively,
 to the *pre-order* and the *post-order* visit strategy.
 
   The easiest way to visit the AST depth-first is to use
-the `astvisit(ast_t ast) { ... }` function. Within the block code guarded
-by `astvisit` you can use the `astonentry { ... }` and `astonexit { ... }`
-to execute code when, respectively, entering/exiting a node. To determine 
-the type of the node your are visting you can use the `astcase(rule, ...)`
-function were you can specify up to five rulenames
+the `astvisit(ast_t ast) { ... }` function.
+
+  Within the block code guarded by `astvisit` you can use `astonentry { ... }` 
+and `astonexit { ... }` to group the actions that are to be executed when,
+respectively, entering/exiting a node.
+
+  To determine the type of the node your are visting, and perform the appriate
+actions, you can use the `astcase(rule, ...) { ... }` function that allows you
+to specify up to five rulenames.
 
 ```
   astvisit(ast, node) { ... } visit the ast with a depth-first strategy
   astonentry { ... }
   astonexit { ... }
   astcase(rule [, rule ... ]) { ... }
+  astdefault { ... }
 ```
+
+To get the visited node data, you can use the following readonly variables:
+
+```
+char     *astcurrule; // The name of the rule corresponding to the node
+char     *astcurfrom; // A pointer to the start of the matching text
+char     *astcurto;   // A pointer to the first character after the matching text
+int32_t   astcurlen;  // The length of the matching text
+int32_t   astcurtag;  // The tag associated to the node
+astnode_t astcurnode; // The node index (to be used with other functions)
+```
+
+### Visit the AST freely
+You can move *freely* in the tree using the following functions:
+
+```
+int32_t astroot(ast_t ast); // Get the root node of AST  
+int32_t astleft(ast_t ast, int32_t node);  // prev. sibling
+int32_t astright(ast_t ast, int32_t node); // next sibling
+int32_t astup(ast_t ast, int32_t node);    // parent
+int32_t astdown(ast_t ast, int32_t node);  // first child
+int32_t astfirst(ast_t ast, int32_t node); // leftmost sibling
+int32_t astlast(ast_t ast, int32_t node);  // rightmost sibling
+```
+
+The following picture shows what happens when you move from a node.
+
+```
+                        (parent)
+                           up
+                            ↑
+      left (prev. sibl.) ← [A] → right (next sibl.), 
+  first (leftmost sibl.)    ↓    last (rightmost sibl.) 
+                           down
+                      (first child)  
+```
+
+If moving it's not possible, the 
 
 ```
 
