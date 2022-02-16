@@ -610,14 +610,7 @@ int skp_(char *src, char *pat, char **to,char **end)
 // PARSE ******************************************************
 // ************************************************************ 
 
-extern char *skp_N_STR_;
-// extern char *skp_N_STR1;
-// #define skp_N_STR2 (skp_N_STR1 + (1*4))
-// #define skp_N_STR3 (skp_N_STR1 + (2*4))
-// #define skp_N_STR4 (skp_N_STR1 + (3*4))
-// #define skp_N_STR5 (skp_N_STR1 + (4*4))
-// #define skp_N_STR6 (skp_N_STR1 + (5*4))
-// #define skp_N_STR7 (skp_N_STR1 + (6*4))
+extern char *skp_N__STRING;
 
 /* 
 ## Parsing
@@ -664,13 +657,14 @@ represent the distance between the open parenthesis and its closing one.
   [ … i … -n … ]  ◄─── Array of int32_t
       ▲    │
       ╰────╯
+  n is the delta between open and close parenthesis.
 ```
 */
 
 typedef struct ast_node_s {
   char   *rule;
-  int32_t from;
-  int32_t to;
+  astnode_t from;
+  astnode_t to;
   int32_t delta; // delta between parenthesis (>0)
   int32_t aux;  // on 64bit systems this would be allocated anyway.
 } ast_node_t;
@@ -768,7 +762,6 @@ void skp__abort(ast_t ast, char *msg,char *rule);
     ast_mmz_t skp_M_ ## rule [4] = {SKP_MMZ_NULL, SKP_MMZ_NULL, SKP_MMZ_NULL, SKP_MMZ_NULL}; \
     void  skp_R_ ## rule (ast_t astcur, int32_t *skp_ret) 
 
-//        par = ast_open(astcur,astcur->pos,skp_N_STR1+(n-1)*4);
 #define skp_match(how) \
     if (!astfailed) { \
       char *from_ = astcur->start+astcur->pos; int32_t par;\
@@ -776,7 +769,7 @@ void skp__abort(ast_t ast, char *msg,char *rule);
       if (n==0) {astfailed = 1;} \
       else { \
         astcur->lastinfo = n; \
-        par = ast_open(astcur,astcur->pos,skp_N_STR_);\
+        par = ast_open(astcur,astcur->pos,skp_N__STRING);\
         astcur->lastpos = astcur->pos; \
         astcur->pos += len; \
         ast_close(astcur,astcur->pos,par); \
@@ -991,16 +984,18 @@ typedef struct {
 void skp_memoize(ast_t ast, ast_mmz_t *mmz,char *rule, int32_t old_pos, int32_t start_par);
 int skp_dememoize(ast_t ast, ast_mmz_t *mmz, char *rule);
 
+typedef int32_t astnode_t;
+
 // #define astinfo(n) astnewinfo(astcur,n)
 #define astsetinfo(...)     skp_vrg(ast_setinfo,__VA_ARGS__)
 #define ast_setinfo1(i)     ast_setinfo(astcur,i,ASTNULL)
 #define ast_setinfo2(a,i)   ast_setinfo(a,i,ASTNULL)
 #define ast_setinfo3(a,i,n) ast_setinfo(a,i,n)
 
-void ast_setinfo(ast_t ast, int32_t info, int32_t node);
+void ast_setinfo(ast_t ast, int32_t info, astnode_t node);
 
 void astnewinfo(ast_t ast, int32_t info);
-int32_t astnodeinfo(ast_t ast, int32_t node);
+int32_t astnodeinfo(ast_t ast, astnode_t node);
 
 #define astswap ast_swap(astcur)
 void ast_swap(ast_t ast);
@@ -1011,7 +1006,7 @@ int32_t ast_newpar(ast_t ast);
 int32_t ast_newnode(ast_t ast);
 
 #define astlower(a,r,f,t) do { extern char *skp_N_ ## r; ast_lower(a, skp_N_ ## r, f, t); } while(0)
-void ast_lower(ast_t astcur, char *rule, int32_t from, int32_t to);
+void ast_lower(ast_t astcur, char *rule, astnode_t from, astnode_t to);
 
 #define astlift ast_lift(astcur)
 void ast_lift(ast_t ast);
@@ -1027,7 +1022,7 @@ void ast_noemptyleaf(ast_t ast);
 
 #define astlastnode ast_lastnode(astcur)
 //ast_node_t *ast_lastnode(ast_t ast);
-int32_t ast_lastnode(ast_t ast);
+astnode_t ast_lastnode(ast_t ast);
 
 #define astlastnodeisempty ast_lastnodeisempty(astcur)
 int ast_lastnodeisempty(ast_t ast);
@@ -1036,12 +1031,12 @@ int ast_lastnodeisempty(ast_t ast);
 void ast_delete(ast_t ast);
 
 static inline int32_t astroot(ast_t ast) {return 0;}
-int32_t astleft(ast_t ast, int32_t node);  // prev. sibling
-int32_t astright(ast_t ast, int32_t node); // next sibling
-int32_t astup(ast_t ast, int32_t node);    // parent
-int32_t astdown(ast_t ast, int32_t node);  // first child
-int32_t astfirst(ast_t ast, int32_t node); // leftmost sibling
-int32_t astlast(ast_t ast, int32_t node);  // rightmost sibling
+int32_t astleft(ast_t ast, astnode_t node);  // prev. sibling
+int32_t astright(ast_t ast, astnode_t node); // next sibling
+int32_t astup(ast_t ast, astnode_t node);    // parent
+int32_t astdown(ast_t ast, astnode_t node);  // first child
+int32_t astfirst(ast_t ast, astnode_t node); // leftmost sibling
+int32_t astlast(ast_t ast, astnode_t node);  // rightmost sibling
 
 #define astlastinfo (astcur->lastinfo)
 #define astsetlastinfo(n) (astcur->lastinfo = n)
@@ -1057,9 +1052,9 @@ int32_t astlast(ast_t ast, int32_t node);  // rightmost sibling
 #define ast_nodeis6(a,n,r1,r2,r3,r4)    ast_isn(a,n, skp_N_ ## r1, r2,     r3,   r4, NULL)
 #define ast_nodeis7(a,n,r1,r2,r3,r4,r5) ast_isn(a,n, skp_N_ ## r1, r2,     r3,   r4,   r5)
 
-int ast_isn(ast_t ast, int32_t node, char*r1, char*r2, char*r3, char*r4, char*r5);
-int ast_is(ast_t ast, int32_t node, char*rulename);
-int astisleaf(ast_t ast, int32_t node);
+int ast_isn(ast_t ast, astnode_t node, char*r1, char*r2, char*r3, char*r4, char*r5);
+int ast_is(ast_t ast, astnode_t node, char*rulename);
+int astisleaf(ast_t ast, astnode_t node);
 
 int asthaserr(ast_t ast);
 
@@ -1070,17 +1065,20 @@ void astprinttree(ast_t ast, FILE *f);
 #define astprint astprinttree
 
 #define ASTNULL -1
-int32_t astnextdf(ast_t ast, int32_t ndx);
+int32_t astnextdf(ast_t ast, astnode_t ndx);
 
-int astisnodeentry(ast_t ast, int32_t ndx);
-int astisnodeexit(ast_t ast, int32_t ndx);
+int astisnodeentry(ast_t ast, astnode_t ndx);
+int astisnodeexit(ast_t ast, astnode_t ndx);
 
 #define astcurnode astcur->cur_node
 #define astcurrule astcur->cur_rule
 #define astcurfrom astnodefrom(astcur,astcurnode)
 #define astcurto   astnodeto(astcur,astcurnode)
 #define astcurlen  astnodelen(astcur, astcurnode)
-#define astcurnodeinfo astnodeinfo(astcur,astcurnode)
+#define astcurtag  astnodeinfo(astcur,astcurnode)
+
+// **DEPRECATED**
+#define astcurnodeinfo astcurtag
 
 static inline ast_t ast_cur_init(ast_t ast)
 { 
@@ -1147,10 +1145,10 @@ static inline ast_t ast_cur_init(ast_t ast)
       (astcurrule != skp_N_ ## r5)    \
       ) ; else
 
-char *astnoderule(ast_t ast, int32_t node);
-char *astnodefrom(ast_t ast, int32_t node);
-char *astnodeto(ast_t ast, int32_t node);
-int32_t astnodelen(ast_t ast, int32_t node);
+char *astnoderule(ast_t ast, astnode_t node);
+char *astnodefrom(ast_t ast, astnode_t node);
+char *astnodeto(ast_t ast, astnode_t node);
+int32_t astnodelen(ast_t ast, astnode_t node);
 
 #define skp_msg_none skpemptystr
 
@@ -1328,14 +1326,13 @@ int skp_debug2(ast_t ast,uint8_t d)
   return ast->flg & SKP_DEBUG;
 }
 
-// char *skp_N_STR1 = "$1\0 $2\0 $3\0 $4\0 $5\0 $6\0 $7\0";
-char *skp_N_STR_  = "$";
-char *skp_N_INFO = "#";
+char *skp_N__STRING = "$";
+char *skp_N__INFO   = "#";
 
 ast_t skp_parse(char *src, skprule_t rule,char *rulename, int debug)
 {
   ast_t ast = NULL;
-  int32_t open;
+  astnode_t open;
   if (!(ast = ast_new())) return NULL;
   ast->start = src;
   ast->flg = debug?SKP_DEBUG:0;
@@ -1357,7 +1354,7 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename, int debug)
 
 int ast_lastnodeisempty(ast_t ast)
 {
-  int32_t node;
+  astnode_t node;
   ast_node_t *nd;
   node = ast_lastnode(ast);
   if (node == ASTNULL) return 0;
@@ -1386,7 +1383,7 @@ int32_t ast_lastnode(ast_t ast)
 
   return (ast->nodes+ast->par[o1]);
 #endif
-  int32_t o1, c1;
+  astnode_t o1, c1;
 
   if (ast->fail || ast->par_cnt < 2) return ASTNULL;
   
@@ -1412,7 +1409,7 @@ void ast_swap(ast_t ast)
   //   \  '------- o2+(c1-o1+1)
   //    '--------- o2   
 
-  int32_t o1, c1, o2, c2;
+  astnode_t o1, c1, o2, c2;
 
  _skptrace("SWAP fail? %d",ast->fail);
   if (ast->fail || ast->par_cnt < 4) return;
@@ -1458,7 +1455,7 @@ void ast_lift(ast_t ast)
   //    \   '---- c2
   //     '------- o2   
 
-  int32_t o1, c1, o2, c2;
+  astnode_t o1, c1, o2, c2;
 
   if (ast->fail || ast->par_cnt < 4) return;
   
@@ -1528,7 +1525,7 @@ void ast_lift_all(ast_t ast)
   //    \     '---- c2
   //     '------- o2   
 
-  int32_t n;  
+  astnode_t n;  
   do {
     n = ast->par_cnt;
    _skptrace("L1: %d",n);
@@ -1537,7 +1534,7 @@ void ast_lift_all(ast_t ast)
   } while (n != ast->par_cnt);
 }
 
-void ast_lower(ast_t astcur, char *rule, int32_t lft, int32_t rgt)
+void ast_lower(ast_t astcur, char *rule, astnode_t lft, astnode_t rgt)
 {
   // insert node and lower children
   //    ,----------- lft
@@ -1548,10 +1545,10 @@ void ast_lower(ast_t astcur, char *rule, int32_t lft, int32_t rgt)
 
   if (!astcur || astcur->par_cnt<=lft || astcur->par_cnt <= rgt || lft >= rgt) return;
 
-  int32_t node;
+  astnode_t node;
 
-  int32_t node_from;
-  int32_t node_to;
+  astnode_t node_from;
+  astnode_t node_to;
 
   // ensure we are on the opening par of the node
   if (astcur->par[lft] < 0) lft += astcur->par[lft];
@@ -1799,7 +1796,6 @@ char *astnodefrom(ast_t ast, int32_t node)
 {
   if (!ast || node >= ast->par_cnt || node < 0) return skpemptystr;
   if (ast->par[node]<0) node += ast->par[node];
-  if (ast->nodes[ast->par[node]].rule == skp_N_INFO) return skp_N_INFO+1;
   return (ast->start+ast->nodes[ast->par[node]].from);
 }
 
@@ -1807,7 +1803,6 @@ char *astnodeto(ast_t ast, int32_t node)
 {
   if (!ast || node >= ast->par_cnt || node < 0) return skpemptystr;
   if (ast->par[node]<0) node += ast->par[node];
-  if (ast->nodes[ast->par[node]].rule == skp_N_INFO) return skp_N_INFO+1;
   return (ast->start+ast->nodes[ast->par[node]].to);
 }
 
@@ -1815,7 +1810,6 @@ int32_t astnodelen(ast_t ast, int32_t node)
 {
   if (!ast || node >= ast->par_cnt || node < 0) return 0;
   if (ast->par[node]<0) node += ast->par[node];
-  if (ast->nodes[ast->par[node]].rule == skp_N_INFO) return 0;
   return (ast->nodes[ast->par[node]].to - ast->nodes[ast->par[node]].from);
 }
 
@@ -1953,7 +1947,7 @@ int32_t ast_newnode(ast_t ast)
   return ast->nodes_cnt++; 
 }
 
-int32_t ast_open(ast_t ast, int32_t from, char *rulename)
+int32_t ast_open(ast_t ast, astnode_t from, char *rulename)
 {
   int32_t par;
   int32_t node; 
@@ -1966,10 +1960,10 @@ int32_t ast_open(ast_t ast, int32_t from, char *rulename)
   return par;
 }
 
-int32_t ast_close(ast_t ast, int32_t to, int32_t open)
+int32_t ast_close(ast_t ast, astnode_t to, astnode_t open)
 {
   ast_node_t *nd;
-  int32_t par;
+  astnode_t par;
   
   if (open <0) return -1;
 
@@ -1996,23 +1990,23 @@ int32_t ast_close(ast_t ast, int32_t to, int32_t open)
 
 void astnewinfo(ast_t ast, int32_t info)
 {
-  int32_t par;
+  astnode_t par;
   if (!ast->fail) {
-    par = ast_open(ast, ast->pos, skp_N_INFO);
+    par = ast_open(ast, ast->pos, skp_N__INFO);
     ast_close(ast, ast->pos, par);
     ast->nodes[ast->par[par]].aux = info;
     ast->lastinfo = info;
   }
 }
 
-int32_t astnodeinfo(ast_t ast, int32_t node)
+int32_t astnodeinfo(ast_t ast, astnode_t node)
 {
   if (!ast || node >= ast->par_cnt || node < 0) return 0;
   if (ast->par[node]<0) node += ast->par[node];
   return ast->nodes[ast->par[node]].aux;
 }
 
-void ast_setinfo(ast_t ast, int32_t info, int32_t node)
+void ast_setinfo(ast_t ast, int32_t info, astnode_t node)
 {
   if (!ast || ast->par_cnt <= node) return;
   if (node == ASTNULL) node = ast->par_cnt-1;
@@ -2029,7 +2023,7 @@ void astprintsexpr(ast_t ast, FILE *f)
       fprintf(f,"(%s ",astnoderule(ast,node));
       if (astisleaf(ast,node)) {
         fputc('\'',f);
-        if (astnoderule(ast,node) == skp_N_INFO) {
+        if (astnoderule(ast,node) == skp_N__INFO) {
           fprintf(f,"%d",astnodeinfo(ast,node));
         }
         else for (char *s = astnodefrom(ast,node); s < astnodeto(ast,node); s++) {
@@ -2059,10 +2053,7 @@ void astprinttree(ast_t ast, FILE *f)
       levl +=4;
       if (astisleaf(ast,node)) {
         fputc(' ',f); fputc('\'',f);
-        /*if (astnoderule(ast,node) == skp_N_INFO) {
-          fprintf(f,"%d",astnodeinfo(ast,node));
-        }
-        else */for (char *s = astnodefrom(ast,node); s < astnodeto(ast,node); s++) {
+        for (char *s = astnodefrom(ast,node); s < astnodeto(ast,node); s++) {
           if (*s == '\'') fputc('\\',f);
           fputc(*s,f);
         }
