@@ -1,4 +1,4 @@
-# skp
+# 
 <p width="100%" style="align:center">
 <img height="150" src="https://raw.githubusercontent.com/rdentato/skp/master/docs/oval_logo_small.png"> <br/>
  
