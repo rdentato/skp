@@ -1,6 +1,6 @@
 # skp
-<img style="text-align:center" height="50%" src="https://raw.githubusercontent.com/rdentato/skp/master/docs/oval_logo_small.png"/>
-<p>
+<p style="text-align:center">
+<img height="150" src="https://raw.githubusercontent.com/rdentato/skp/master/docs/oval_logo_small.png"> <br/>
   <a href="https://discord.gg/vPgsxHcgXX"><img src="https://github.com/rdentato/skp/blob/master/docs/Discord_button.jpg?raw=true" title="Join Discord Channel"></a>
 </p>
 
