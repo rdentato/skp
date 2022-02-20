@@ -33,8 +33,8 @@
 int skp_(char *src, char *pat, char **end, char **to);
 
 #define skp(...)    skp_vrg(skp_,__VA_ARGS__)
-#define skp_4(s,p,e,t)  skp_(s,p, e,t);
-#define skp_3(s,p,e)    skp_(s,p, e,NULL);
+#define skp_4(s,p,e,t)  skp_(s,p, e,t)
+#define skp_3(s,p,e)    skp_(s,p, e,NULL)
 #define skp_2(s,p)      skp_(s,p,NULL,NULL)
 
 // [Scanning]
