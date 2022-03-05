@@ -63,7 +63,7 @@ files, etc..) we have restricted the concept of *letters* and *digit* to the
 ones encoded in ASCII.
 
 ```
-   .      any non \0 character
+   .      any non \0 character (match one codepoint if UTF-8 enabled)
    a      ASCII alphabetic char
    l      ASCII lower case
    u      ASCII upper case
@@ -84,7 +84,7 @@ These recognizers are useful when working with numbers:
    X  hex number (possibly with leading 0x)
 ```
 
-### Spaces
+### Special characters
 
 ```
    w  white space (includes some Unicode spaces)
@@ -105,31 +105,80 @@ These recognizers are useful when working with numbers:
 ### Strings
 
 ```
-   ' " or ` a literal string (useful for optional and negatives)
+   ' " or ` a literal string
    Q  Quoted string with '\' as escape
-   B  Balanced sequence of parenthesis (can be '()''[]''{}')
+   B  Balanced sequence of parenthesis (can be '()', '[]', or '{}')
    () Balanced parenthesis (only '()')
    N  Anything up to the end of line
 ```
 
+### Modifiiers
+
 ```
    C  case sensitive (ASCII) comparison
-   U  utf-8 encoding (or ASCII/ISO-8859)
-   >  skip to the start of pattern (skip to)
+```
+  By default, the match is case sensitive for ASCII strings you can 
+change by adding `!C` to the pattern.
+  To revert to case sensitive match, put `C` in the pattern.
 
+```
+   U  utf-8 encoding (or ASCII/ISO-8859)
+```
+  By default, strings are considered to be a sequence of UTF-8 encoded
+Unicode codepoints.
+  You can switch to ISO-8859-1 (Latin-1) adding `!U` to the pattern.
+
+```
+   >  skip to the start of pattern (skip to)
+```
+  See the section "Skip to" below.
+
+
+```
    *  zero or more match
    ?  zero or one match
    +  one or more match
+```
 
+```
    !  negate
 
    &  set goal
    !& set negative goal
+```
 
+### Pattern alternatives
 
+  You can try multiple (up to seven) patternes with a single `skp()` call.
+The value returned will tell which pattern has been matched.
+
+```
    \1 ... \7  alternatives
+```
+
+Example:
+
+```
+    n = skp(text,"D\3X",end);
+
+    "XYZ" -> n will be 0
+    "123" -> n will be 3
+    "A32" -> n will be 1
+```
+
+### String alternatives
+  You can match multiple verbatim strings at once separating the with `\xE`
+
+```
    \xE string alternatives
 ```
+
+Example:
+
+```
+    n = skp(text,"D 'in\xEcm'",end);
+```
+  Will match an integer followed by either `in` or `cm`.
 
 ## Level 1: Skipping
 
@@ -226,7 +275,7 @@ the pattern, you can use another form of the `skp` function:
 ```
 If there is no match, both `to` and `end` will be set equal to `start`.
 
-Here is a full example:
+Example:
 
 ``` C
    char *text = "ab c 123 de";
@@ -234,7 +283,7 @@ Here is a full example:
 
    skp(text, ">D", &to, &end);
 
-   //   ab c 123 de
+   //   abxcy123pde
    //   ▲    ▲  ▲
    //   │    │  ╰── end
    //  text  ╰───── to
@@ -355,9 +404,10 @@ uaing the function:
    skpmatch(pattern)      match a skp pattern
    skplookup(f) { ... }   call a C function and use the return code
    skpcheck(f)            call a C function
+
+   - skpinfo(n);          add an INFO node tagged with the specified value;
 ```
 
- 
 
  Terminals and non-terminals can be grouped using the following functions:
 
@@ -461,21 +511,120 @@ the tree so that it is better suited for being processed.
 
   Functions that match a terminal or non-terminal will add a node to the
 AST with the following information:
-   - rule: the name of the rule that matched (`_STRING` for `skpmatch()`
+   - `rule`: the name of the rule that matched (`_STRING` for `skpmatch()`
      and `skpstring()`)
-   - from: pointer to the start of the matching text
-   - to: pointer to the end of the matching text
-   - len: length of the matching text
-   - tag: a numeric tag associated to the node
+   - `from`: pointer to the start of the matching text
+   - `to`: pointer to the end of the matching text
+   - `len`: length of the matching text
+   - `tag`: a numeric tag associated to the node
 
   Note that some nodes are *tagged* with an integer. Tagging a node can
 help during the AST traversal and avoid extra work. In the example 
 above, the two strings below the `op` nodes, are tagged with `(1)` for
 the `+` operation and with `(2)` for `-`.
 
+### AST in-grammar modifiers
+
+  It is important to *visualize* the AST while it is built.
+You can understand better this simple parser for expressions:
+```
+  skpdef(expr) {
+    skprule(term);
+    skprule(op);
+    skprule(term);
+  }
+  skpdef(op) {
+    skpstring("+",2);
+    skpor 
+    skpstring("-",3);
+  }
+  skpdef(term) {
+    skpmatch("D\6I\7"); // a decimal number or an identifier
+  }
+```
+
+considering that each `skp...` call will create a node in the AST:
+
+```
+   3+x
+   
+              [expr]
+      ╭─────────┼────────╮
+   [term]     [op]    [term]
+      │         │        │
+   [$ (6)]   [$ (2)]  [$ (7)]
+      │         │        │
+     '3'       '+'      'x'
+```
+You can easily map each node in the tree to the rule that generated it.
+
+  Visualizing the tree while it is being built is of paramount
+importance to use the *AST-in grammar modifiers* that allow you
+to modify (to a certain extent) the subtree that is beign built
+by the grammar rules.
+
+  Sometime you don't want certain nodes in the final AST.
+Tipically, spaces and separators are useless for the next steps of
+the transformation. 
+
+  You can prevent a node to be generated using the variant of the `skp...`
+functions that ends with an underscore. For example, modifying the
+simple parser for expressions as shown here:
+
+```
+  skpdef(expr) {
+    skprule_(term);
+    skprule_(op);
+    skprule_(term);
+  }
+  skpdef(op) {
+    skpstring("+",2);
+    skpor 
+    skpstring("-",3);
+  }
+  skpdef(term) {
+    skpmatch("D\6I\7"); // a decimal number or an identifier
+  }
+```
+
+will result in a simpler tree to be built:
+
+```
+   3+x
+   
+              [expr]
+      ╭─────────┼────────╮
+   [$ (6)]   [$ (2)]  [$ (7)]
+      │         │        │
+     '3'       '+'      'x'
+
+```
+
+
+The following ast modifiers:
+```
+  - skpast(swap);            swap last node with its left sibling;
+  - skpast(lift);            replace a node with its only child;
+  - skpast(liftall);         replace a node with all its children;
+  - skpast(delete);          deletes the last node;
+  - skpast(delleaf);         remove previous node if it's a leaf;
+  - skpast(delempty);        remove previous node if it's a leaf and it's empty;
+  - skpast(swapordel);       swap last node if it's not empty, otherwise delete it;
+```
+An *empty* node is a node that matches the empty string.
+
+```
+  - skpast(lastnode);        returns a pointer to last node (of type ast_node_t *); 
+  - skpast(lastnodeisempty)  returns true if the text matched by last 
+```
+
+
 ### Visiting the AST depth-first
-  A very common traversing order for AST is *depth-first* where
-all children of a node are visited before visiting its siblings.
+  Once the AST has been completely built, it's time to visit it to perform other
+steps in the text processing.
+
+  A very common traversing order for AST is *depth-first* where all children
+of a node are visited before visiting its siblings.
 
 ```
        A    
@@ -506,6 +655,7 @@ to specify up to five rulenames.
 
 ```
   astvisit(ast, node) { ... } visit the ast with a depth-first strategy
+                              node will held the index for the current node
   astonentry { ... }
   astonexit { ... }
   astcase(rule [, rule ... ]) { ... }
@@ -548,7 +698,7 @@ The following picture shows what happens when you move from a node.
                       (first child)  
 ```
 
-If moving it's not possible, the 
+If moving it's not possible, the value `ASTNULL` will be returned.
 
 ```
 
@@ -568,32 +718,6 @@ If moving it's not possible, the
   char   *astnodefrom(ast_t ast, int32_t node);
   char   *astnodeto(ast_t ast, int32_t node);
   int32_t astnodelen(ast_t ast, int32_t node);
-```
-
-### AST in-grammar modifiers
-Sometime you don't want certain nodes in the final AST.
-Tipically, spaces and separators are useless for the next steps of
-the transformation. 
-
-You can prevent a node to be generated using a variant of the skp... functions
-(ending with an underscore:)
-```
-  skpmatch_(char *pattern);
-  skpstring_(char *string [, int alt]);
-  skprule_(rule);
-```
-
-There also the following ast modifiers:
-```
-  - astswap;         swap last record with its left sibling;
-  - astlift;         replace a node with its only child;
-  - astliftall;      replace a node with all its children;
-  - astinfo(n);      add an INFO node with the specified value;
-  - astnoleaf;       remove previous node if it's a leaf;
-  - astnoemptyleaf;  remove previous node if it's a leaf and it's empty;
-  - astlastnode;     returns a pointer to last node (of type ast_node_t *); 
-  - astremove;       deletes the last node;
-  - astlastnodeisempty returns true if the text matched by last 
 ```
 
 ## skpgen

@@ -59,22 +59,22 @@ skpdef(retval) {
 
 skpdef(match) {
   skponce { skprule(match_term); skprule(repeat);
-            astswapnoempty;
-            astliftall;
+            skpast(swapnoempty);
+            skpast(liftall);
           } 
 }
  
 skpdef(repeat) { skpmatch_("?[+*?]"); }
 
 skpdef(match_term) {
-  skponce { skprule(modifier); astnoemptyleaf;
+  skponce { skprule(modifier); skpast(delempty);
             skponce { skprule(pattern); }
               skpor { skprule(chkfun); skpmatch_("S '[' S ']' S"); }
               skpor { skprule(lookup); }
               skpor { skprule(ruleref); } 
           }
     skpor { skpstring_("("); skprule_(spc_); 
-            skprule(alt); astliftall;
+            skprule(alt); skpast(liftall);
             skprule_(spc_); skpstring_(")");
           }
     // skpor { skpstring_("#"); skpmatch("D"); /*skptrace("INFO: %d %d",astfailed, *astcurfrom);*/ }
@@ -82,7 +82,9 @@ skpdef(match_term) {
 
 skpdef(ruleref)  { skpmatch_("I !@ S ':'"); }
 
-skpdef(pattern)  { skpmaybe { skpstring_("$"); if (!astfailed) {astretval(1);} }
+#define PATTERN_IS_STRING 1
+
+skpdef(pattern)  { skpmaybe { skpstring_("$"); if (!astfailed) {astretval(PATTERN_IS_STRING);} }
                    skpmatch_("Q");
                  }
 
@@ -147,12 +149,12 @@ void prtrepeat(char repeat, int32_t indent, FILE *src, int nl)
 
 void prtmodifier(uint8_t modifier, FILE *src)
 {
-  if (modifier & MOD_LIFTALL)     fprintf(src," astliftall;");
-  if (modifier & MOD_LIFT)        fprintf(src," astlift;");
-  if (modifier & MOD_SWAP)        fprintf(src," astswap;");
-  if (modifier & MOD_NOEMPTY)     fprintf(src," astnoemptyleaf;");
-  if (modifier & MOD_NOLEAF)      fprintf(src," astnoleaf;");
-  if (modifier & MOD_SWAPNOEMPTY) fprintf(src," astswapnoempty;");
+  if (modifier & MOD_LIFTALL)     fprintf(src," skpast(liftall);");
+  if (modifier & MOD_LIFT)        fprintf(src," skpast(lift);");
+  if (modifier & MOD_SWAP)        fprintf(src," skpast(swap);");
+  if (modifier & MOD_NOEMPTY)     fprintf(src," skpast(delempty);");
+  if (modifier & MOD_NOLEAF)      fprintf(src," skpast(delleaf);");
+  if (modifier & MOD_SWAPNOEMPTY) fprintf(src," skpast(swapnoempty);");
 }
 
 void prtruledef(char *from, int32_t len, FILE *src)
@@ -253,7 +255,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
 
       astcase(pattern) { 
         if (repeat) { prtrepeat(repeat,indent,src, nl); indent+=2; }
-        if (astcurnodeinfo == 1) {
+        if (astcurnodeinfo == PATTERN_IS_STRING) {
           fprintf(src,"%*sskpstring%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
           fprintf(src,"(\"%.*s\");",astcurlen-3,astcurfrom+2);
         }

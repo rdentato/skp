@@ -748,6 +748,7 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename, int debug);
 
 #define skpabort(...)    skp_abort(astcurrule, (char *)(__VA_ARGS__ + 0))
 #define skp_abort(r,m)   skp__abort(astcur,m,r)
+
 #define astabort(...) skpabort(__VA_ARGS__)
 
 void skp__abort(ast_t ast, char *msg,char *rule);
@@ -996,9 +997,12 @@ void ast_setinfo(ast_t ast, int32_t info, astnode_t node);
 void astnewinfo(ast_t ast, int32_t info);
 int32_t astnodeinfo(ast_t ast, astnode_t node);
 
+#define skpast(x) ast##x
+
 #define astswap ast_swap(astcur)
 void ast_swap(ast_t ast);
 
+#define astswapordel
 #define astswapnoempty  if (astlastnodeisempty) astremove; else astswap
 
 int32_t ast_newpar(ast_t ast);
@@ -1013,9 +1017,11 @@ void ast_lift(ast_t ast);
 #define astliftall ast_lift_all(astcur)
 void ast_lift_all(ast_t ast);
 
+#define astdelleaf astnoleaf
 #define astnoleaf ast_noleaf(astcur)
 void ast_noleaf(ast_t ast);
 
+#define astdelempty astnoemptyleaf
 #define astnoemptyleaf ast_noemptyleaf(astcur)
 void ast_noemptyleaf(ast_t ast);
 
@@ -1026,6 +1032,7 @@ astnode_t ast_lastnode(ast_t ast);
 #define astlastnodeisempty ast_lastnodeisempty(astcur)
 int ast_lastnodeisempty(ast_t ast);
 
+#define astdelete ast_delete(astcur)
 #define astremove ast_delete(astcur)
 void ast_delete(ast_t ast);
 
