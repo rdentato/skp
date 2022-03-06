@@ -8,12 +8,14 @@ CC=gcc
 
 OPT=-O2
 OPT=-O2 -Os -fdata-sections -ffunction-sections
-#OPT=-ggdb3 -O0
+#OPT+=-ggdb3 -O0
 
-LNFLAGS=-Wl,--gc-sections
-#LNFLAGS=
+#PROFFLAGS=-pg
 
-CFLAGS =  $(OPT) -Wall -I$(TOP)/src
+LNFLAGS= $(PROFFLAGS)
+LNFLAGS+=  -Wl,--gc-sections
+
+CFLAGS = $(PROFFLAGS) $(OPT) -Wall -I$(TOP)/src
 
 all:
 	@cd ../skpgen; make skpgen
@@ -31,3 +33,4 @@ lox.c: lox.skp
 clean:
 	$(RM) *.o lox lox.c lox.h lox.t
 	$(RM) test/*.t test/*.o
+	$(RM) gmon.out callgrind.out.*

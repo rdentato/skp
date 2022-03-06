@@ -139,9 +139,21 @@ static uint32_t skp_next(char *s,char **end,int iso)
   if (s && *s) {
     c = *s++;
     if (!iso) {
-      while ((*s & 0xC0) == 0x80) {
-         c = (c << 8) | *s++;
+#if 1
+      if ((*s & 0xC0) == 0x80) {
+        c = (c << 8) | *s++;
+        if ((*s & 0xC0) == 0x80) {
+          c = (c << 8) | *s++;
+          if ((*s & 0xC0) == 0x80) {
+            c = (c << 8) | *s++;
+          }
+        }
       }
+#else
+      while ((*s & 0xC0) == 0x80) {
+        c = (c << 8) | *s++;
+      }
+#endif
     }
     if (c == 0x0D && *s == 0x0A) {
       c = 0x0D0A; s++;
@@ -163,6 +175,23 @@ static int chr_cmp(uint32_t a, uint32_t b, int fold)
 
 static int is_blank(uint32_t c)
 {
+#if 1  
+
+  if (c < 0xFF) return  (c == 0x20) || (c == 0x09);
+
+  switch ( c & 0xFFFFFF00) {
+    case 0x00000000 : return c == 0xA0; 
+    case 0x0000C200 : return c == 0xC2A0;
+
+    case 0x00E19A00 : return c == 0xE19A80;
+
+    case 0x00E28000 : return ((0xE28080 <= c) && (c <= 0xE2808A))
+                             || (c == 0xE280AF);
+
+    case 0x00E38080 : return c == 0xE38080;
+  }
+  return 0;
+#else
   return (c == 0x20) || (c == 0x09)
       || (c == 0xA0) || (c == 0xC2A0)
       || (c == 0xE19A80)
@@ -171,10 +200,25 @@ static int is_blank(uint32_t c)
       || (c == 0xE2819F)
       || (c == 0xE38080)
       ;
+#endif
 }
 
 static int is_break(uint32_t c)
 {
+#if 1
+  if (c < 0x0F) return  (c == 0x0A)
+                     || (c == 0x0C)
+                     || (c == 0x0D);
+
+  if (c < 0xFF) return (c == 0x85);
+
+  return (c == 0x0D0A)    // CRLF (not a real UTF-8 CODEPOINT!!!)
+      || (c == 0xC285)    // U+0085 NEL next line         
+      || (c == 0xE280A8)  // U+2028 LS line separator     
+      || (c == 0xE280A9)  // U+2029 PS paragraph separator
+      ;
+
+#else
   return (c == 0x0A)      // U+000A LF line feed           
       || (c == 0x0C)      // U+000C FF form feed          
       || (c == 0x0D)      // U+000D CR carriage return     
@@ -184,6 +228,7 @@ static int is_break(uint32_t c)
       || (c == 0xE280A8)  // U+2028 LS line separator     
       || (c == 0xE280A9)  // U+2029 PS paragraph separator
       ;
+#endif
 }
 
 static int is_space(uint32_t c)
