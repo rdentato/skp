@@ -42,8 +42,8 @@ skpdef(seq) {
          }
 }
 
-skpdef(errmsg) { skponce { skpmatch_("&'\"'"); skpmatch_("Q"); }
-                   skpor { skpmatch_("I"); }
+skpdef(errmsg) { skponce { skpmatch_("&'\"'"); skpmatch_("Q"); } // errmsg
+                   skpor { skpmatch_("I"); }                     // char *
                }
 
 skpdef(abort) { skponce { skpmatch_("&'\"'"); skpmatch_("Q"); }
@@ -80,7 +80,7 @@ skpdef(match_term) {
     // skpor { skpstring_("#"); skpmatch("D"); /*skptrace("INFO: %d %d",astfailed, *astcurfrom);*/ }
 }
 
-skpdef(ruleref)  { skpmatch_("I !@ S ':'"); }
+skpdef(ruleref)  { skpmatch_("I !& S ':'"); }
 
 #define PATTERN_IS_STRING 1
 
@@ -115,8 +115,8 @@ skpdef(lu_func) { skpmatch_("I") ;}
 skpdef(lu_case) { skpmatch_("I\1D"); }
 skpdef(alt_case) { skprule_(alt); }
 
-skpdef(code) {skpmatch_("@'{'"); skpmatch_("B"); }
-skpdef(incode) {skpmatch_("@'{'"); skpmatch_("B"); }
+skpdef(code) {skpmatch_("&'{'"); skpmatch_("B"); }
+skpdef(incode) {skpmatch_("&'{'"); skpmatch_("B"); }
 
 skpdef(spc_) { skpany{ 
                    skpmatch_("+s");
@@ -259,6 +259,10 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
           fprintf(src,"%*sskpstring%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
           fprintf(src,"(\"%.*s\");",astcurlen-3,astcurfrom+2);
         }
+        else if (*astcurfrom == '\'') {
+          fprintf(src,"%*sskpstring%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
+          fprintf(src,"(\"%.*s\");",astcurlen-2,astcurfrom+1);
+        }
         else {
           fprintf(src,"%*sskpmatch%s",indent, skpemptystr, modifier & MOD_FLAT ? "_":"");
           fprintf(src,"(\"%.*s\");",astcurlen-2,astcurfrom+1);
@@ -280,6 +284,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         if (repeat) { indent-=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
         repeat = '\0';
         modifier = 0;
+        fprintf(hdr,"extern char *skp_N_%.*s;\n",astcurlen, astcurfrom);
       }
 
       astcase(lu_func) {
@@ -293,10 +298,14 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         push(rpt);
         repeat = '\0';
         modifier = 0;
+        fprintf(hdr,"extern char *skp_N_%.*s;\n",astcurlen, astcurfrom);
       }
 
       astcase(lu_case) {
-        fprintf(src,"%*scase %.*s:%c",indent,skpemptystr,astcurlen,astcurfrom,nl);
+        if (strncmp("default",astcurfrom,7) == 0) 
+          fprintf(src,"%*sdefault :%c",indent,skpemptystr,nl);
+        else 
+          fprintf(src,"%*scase %.*s:%c",indent,skpemptystr,astcurlen,astcurfrom,nl);
         indent +=4;
       }
       

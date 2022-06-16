@@ -408,8 +408,8 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
       case 'w' : W(is_blank(s_chr));  break;
       case 'c' : W(is_ctrl(s_chr));   break;
       case 'i' : W(is_idchr(s_chr));  break;
+      case '@' : W(is_alnum(s_chr));  break;
       
-      case '@' : /* <- @ is deprecated, will be removed */
       case '&' : ret = match_not? MATCHED_GOALNOT : MATCHED_GOAL;
                  break;
 
@@ -712,7 +712,7 @@ typedef struct ast_node_s {
   astnode_t from;
   astnode_t to;
   int32_t delta; // delta between parenthesis (>0)
-  int32_t aux;  // on 64bit systems this would be allocated anyway.
+  int32_t tag;  // on 64bit systems this would be allocated anyway.
 } ast_node_t;
 
 typedef struct ast_mmz_s {
@@ -736,6 +736,7 @@ typedef struct ast_s {
   ast_mmz_t **mmz;
   int32_t    *par;  // ≥ 0 ⇒ Open parenthesis (index into the nodes array)
                     // < 0 ⇒ Closed parenthesis (delta to the open par.)
+  void       *auxptr;
   jmp_buf     jbuf;
   int32_t     nodes_cnt;
   int32_t     nodes_max;
@@ -764,6 +765,9 @@ int skp_debug2(ast_t ast,uint8_t d);
 
 #define astfailed (astcur->fail)
 #define astfail ((astcur->fail) = 1)
+#define astmatch ((astcur->fail) = 0)
+
+#define astaux(a) ((a)->auxptr)
 
 //  Getting error infomration
 char   *asterrrule(ast_t ast);   // ◄── Which rule we got the error
@@ -820,7 +824,7 @@ void skp__abort(ast_t ast, char *msg,char *rule);
         astcur->lastpos = astcur->pos; \
         astcur->pos += len; \
         ast_close(astcur,astcur->pos,par); \
-        astcur->nodes[astcur->par[par]].aux = n; \
+        astcur->nodes[astcur->par[par]].tag = n; \
         astcur->cur_node = par; \
       } \
       if (astcur->flg & SKP_DEBUG) skptrace("%s: %s @%d", skp_matchfailed+(!!astfailed)*6, "^^^",astcur->pos); \
@@ -883,7 +887,7 @@ void skp__abort(ast_t ast, char *msg,char *rule);
         astcur->lastpos = astcur->pos; \
         astcur->pos = (int32_t)(from_-astcur->start); \
         ast_close(astcur,astcur->pos,par); \
-        astcur->nodes[astcur->par[par]].aux = info; \
+        astcur->nodes[astcur->par[par]].tag = info; \
         astcur->cur_node = par; \
       } \
       if (astcur->flg & SKP_DEBUG) skptrace("RETURN: %s @%d fail: %d info: %d",#f,astcur->pos,astfailed, info); \
@@ -960,7 +964,7 @@ typedef struct {
         } \
         ast_close(astcur,astcur->pos,par); \
         if (!astfailed) { \
-          astcur->nodes[astcur->par[par]].aux = ast_ret; \
+          astcur->nodes[astcur->par[par]].tag = ast_ret; \
           astcur->lastinfo = ast_ret;\
           astcur->cur_node = par; \
           astcur->lastpos = sav_pos; \
@@ -1037,6 +1041,8 @@ int skp_dememoize(ast_t ast, ast_mmz_t *mmz, char *rule);
 #define ast_setinfo2(a,i)   ast_setinfo(a,i,ASTNULL)
 #define ast_setinfo3(a,i,n) ast_setinfo(a,i,n)
 
+#define astsettag astsetinfo
+
 void ast_setinfo(ast_t ast, int32_t info, astnode_t node);
 
 void astnewinfo(ast_t ast, int32_t info);
@@ -1081,6 +1087,8 @@ int ast_lastnodeisempty(ast_t ast);
 #define astremove ast_delete(astcur)
 void ast_delete(ast_t ast);
 
+#define astfallthrough if (1) ; else
+
 static inline int32_t astroot(ast_t ast) {return 0;}
 int32_t astleft(ast_t ast, astnode_t node);  // prev. sibling
 int32_t astright(ast_t ast, astnode_t node); // next sibling
@@ -1097,11 +1105,11 @@ int32_t astlast(ast_t ast, astnode_t node);  // rightmost sibling
 #define astnodeis(...) skp_vrg(ast_nodeis,__VA_ARGS__)
 #define ast_nodeis1(a)   skp_zero
 #define ast_nodeis2(a,n) skp_zero
-#define ast_nodeis3(a,n,r1)             ast_isn(a,n, skp_N_ ## r1, NULL, NULL, NULL, NULL)
-#define ast_nodeis4(a,n,r1,r2)          ast_isn(a,n, skp_N_ ## r1, r2,   NULL, NULL, NULL)
-#define ast_nodeis5(a,n,r1,r2,r3)       ast_isn(a,n, skp_N_ ## r1, r2,     r3, NULL, NULL)
-#define ast_nodeis6(a,n,r1,r2,r3,r4)    ast_isn(a,n, skp_N_ ## r1, r2,     r3,   r4, NULL)
-#define ast_nodeis7(a,n,r1,r2,r3,r4,r5) ast_isn(a,n, skp_N_ ## r1, r2,     r3,   r4,   r5)
+#define ast_nodeis3(a,n,r1)             ast_isn(a,n, skp_N_ ## r1, NULL,         NULL,         NULL,         NULL)
+#define ast_nodeis4(a,n,r1,r2)          ast_isn(a,n, skp_N_ ## r1, skp_N_ ## r2, NULL,         NULL,         NULL)
+#define ast_nodeis5(a,n,r1,r2,r3)       ast_isn(a,n, skp_N_ ## r1, skp_N_ ## r2, skp_N_ ## r3, NULL,         NULL)
+#define ast_nodeis6(a,n,r1,r2,r3,r4)    ast_isn(a,n, skp_N_ ## r1, skp_N_ ## r2, skp_N_ ## r3, skp_N_ ## r4, NULL)
+#define ast_nodeis7(a,n,r1,r2,r3,r4,r5) ast_isn(a,n, skp_N_ ## r1, skp_N_ ## r2, skp_N_ ## r3, skp_N_ ## r4, skp_N_ ## skp_N_ ## r5)
 
 int ast_isn(ast_t ast, astnode_t node, char*r1, char*r2, char*r3, char*r4, char*r5);
 int ast_is(ast_t ast, astnode_t node, char*rulename);
@@ -1117,6 +1125,7 @@ void astprinttree(ast_t ast, FILE *f);
 
 #define ASTNULL -1
 int32_t astnextdf(ast_t ast, astnode_t ndx);
+#define astnext(a,n) astnextdf(a,n)
 
 int astisnodeentry(ast_t ast, astnode_t ndx);
 int astisnodeexit(ast_t ast, astnode_t ndx);
@@ -1127,6 +1136,8 @@ int astisnodeexit(ast_t ast, astnode_t ndx);
 #define astcurto   astnodeto(astcur,astcurnode)
 #define astcurlen  astnodelen(astcur, astcurnode)
 #define astcurtag  astnodeinfo(astcur,astcurnode)
+
+#define astnodetag(a,n) astnodeinfo(a,n)
 
 // **DEPRECATED**
 #define astcurnodeinfo astcurtag
@@ -1395,9 +1406,13 @@ ast_t skp_parse(char *src, skprule_t rule,char *rulename, int debug)
 
     if (ast->fail && ast->err_pos < ast->pos) {
       ast->err_pos = ast->pos; ast->err_rule = rulename;
-    } 
+    }
+      
     ast_close(ast, ast->pos, open);
-    if (ast->nodes_cnt > 0) ast->err_pos = -1;
+    if (ast->nodes_cnt > 0) {
+      ast->err_pos = -1;
+      astsettag(ast,ast->lastinfo,0);
+    }
   }
   skp_mmz_clean(ast);
   return ast;
@@ -1524,8 +1539,8 @@ void ast_lift(ast_t ast)
 
   if (o2 != o1+1) return; // More than one child
 
- _skptrace("REMOVE1: (%d) %s ",ast->nodes[ast->par[o1]].aux,ast->nodes[ast->par[o1]].rule);
-  if (ast->nodes[ast->par[o1]].aux == 0) {
+ _skptrace("REMOVE1: (%d) %s ",ast->nodes[ast->par[o1]].tag,ast->nodes[ast->par[o1]].rule);
+  if (ast->nodes[ast->par[o1]].tag == 0) {
     memmove(ast->par+o1,ast->par+o2,(c2-o2+1)*sizeof(int32_t));
     ast->par_cnt -= 2;
   }
@@ -1559,8 +1574,8 @@ void ast_lift_all(ast_t ast)
   
     if (o2 != o1+1) return; // More than one child
 
-    skptrace("REMOVEA: (%d)",ast->nodes[o1].aux);
-    if (ast->nodes[ast->par[o1]].aux != 0) return;
+    skptrace("REMOVEA: (%d)",ast->nodes[o1].tag);
+    if (ast->nodes[ast->par[o1]].tag != 0) return;
   
     memmove(ast->par+o1,ast->par+o2,(c2-o2+1)*sizeof(int32_t));
     ast->par_cnt -= 2;
@@ -1930,6 +1945,8 @@ ast_t ast_new()
 
   ast->cur_node = ASTNULL;
   ast->cur_rule = NULL;
+
+  ast->auxptr = NULL;
   return ast;
 }
 
@@ -2030,7 +2047,7 @@ int32_t ast_close(ast_t ast, astnode_t to, astnode_t open)
   if ((par = ast_newpar(ast)) < 0) return -1;
   nd->to = to;
   nd->delta = par-open;
-  nd->aux = 0;
+  nd->tag = 0;
   ast->par[par] = -(nd->delta); // Close parenthesis
   
   // Set cur fields for the `astcurxxx()` functions
@@ -2045,7 +2062,7 @@ void astnewinfo(ast_t ast, int32_t info)
   if (!ast->fail) {
     par = ast_open(ast, ast->pos, skp_N__INFO);
     ast_close(ast, ast->pos, par);
-    ast->nodes[ast->par[par]].aux = info;
+    ast->nodes[ast->par[par]].tag = info;
     ast->lastinfo = info;
   }
 }
@@ -2054,7 +2071,7 @@ int32_t astnodeinfo(ast_t ast, astnode_t node)
 {
   if (!ast || node >= ast->par_cnt || node < 0) return 0;
   if (ast->par[node]<0) node += ast->par[node];
-  return ast->nodes[ast->par[node]].aux;
+  return ast->nodes[ast->par[node]].tag;
 }
 
 void ast_setinfo(ast_t ast, int32_t info, astnode_t node)
@@ -2063,7 +2080,7 @@ void ast_setinfo(ast_t ast, int32_t info, astnode_t node)
   if (node == ASTNULL) node = ast->par_cnt-1;
  _skptrace("INF: %s[%d] %d",astnoderule(ast,node),node, info);
   if (ast->par[node]<0) node += ast->par[node];
-  ast->nodes[ast->par[node]].aux = info;
+  ast->nodes[ast->par[node]].tag = info;
 }
 
 void astprintsexpr(ast_t ast, FILE *f)
@@ -2092,14 +2109,14 @@ void astprinttree(ast_t ast, FILE *f)
 {
   int32_t node = ASTNULL;
   int32_t levl = 0;
-  int32_t aux = 0;
+  int32_t tag = 0;
   while ((node = astnextdf(ast,node)) != ASTNULL) {
     if (astisnodeentry(ast,node)) {
       for (int k=0; k<levl; k+=4) fputs("    ",f);
 //      fprintf(f,"[%s #%zX]",astnoderule(ast,node),(uintptr_t)astnoderule(ast,node));
       fprintf(f,"[%s",astnoderule(ast,node));
-      aux = astnodeinfo(ast,node);
-      if (aux != 0) fprintf (f," (%d)",aux);
+      tag = astnodeinfo(ast,node);
+      if (tag != 0) fprintf (f," (%d)",tag);
       fputc(']',f); 
       levl +=4;
       if (astisleaf(ast,node)) {
