@@ -274,10 +274,14 @@ static int is_oneof(uint32_t ch, char *set, int iso)
   uint32_t p_ch,q_ch;
   char *s;
   if (ch == '\0') return 0;
- _skptrace("set: [%s] chr: %c",set,ch);
+
+ _skptrace("set: <%s> chr: %c",set,ch);
   p_ch = skp_next(set,&s,iso);
   
-  if (p_ch == ']' && ch == ']') return 1;
+  if (p_ch == ']') {
+    if (ch == ']') return 1 ;
+    else p_ch = skp_next(s,&s,iso);
+  }
 
   while (p_ch != ']') {
     if (p_ch == ch) return 1;
@@ -414,8 +418,8 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
                  break;
 
       case '[' : W(is_oneof(s_chr,pat,*flg & 2));
+                 if (*pat == ']') pat++;
                  while (*pat && *pat != ']') pat++;
-                 if (*pat && pat[1]==']') pat++;
                  pat++;
                  break;
 
@@ -757,7 +761,7 @@ typedef struct ast_s {
 
 #define SKP_DEBUG     0x01
 #define SKP_LEFTRECUR 0x02
-#define SKP_MAXDEPTH  100
+#define SKP_MAXDEPTH  10000
 
 #define skpdebug(...) skp_vrg(skp_debug,__VA_ARGS__)
 #define skp_debug(a)  skp_debug2(a,0xFF)
