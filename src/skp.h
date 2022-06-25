@@ -97,7 +97,8 @@ extern volatile int skp_zero;
    s  white space and vertical spaces (e.g. LF)
    c  control
    n  newline
-
+   @  alfanumeric 
+   
    .  any character (UTF-8 or ISO character)
 
    Q  Quoted string with '\' as escape
@@ -117,8 +118,8 @@ extern volatile int skp_zero;
    +  one or more match
    !  negate
 
-   @  set goal
-   !@ set negative goal
+   &  set goal
+   !& set negative goal
 
    [...] set
   
