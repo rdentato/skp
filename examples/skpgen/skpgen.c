@@ -37,7 +37,7 @@ skpdef(seq) {
            skpor { skpmatch_("'#'"); skprule(retval); }
            skpor { skpmatch_("'<@'"); skprule(abort); }
            skpor { skpmatch_("'@'?'>'"); skprule(errmsg); }
-           skpor { skpmaybe { skprule(lookahead);} skprule_(match); }
+           skpor { skprule(lookahead); }
            skpor skprule_(match); 
          }
 }
@@ -50,7 +50,8 @@ skpdef(abort) { skponce { skpmatch_("&'\"'"); skpmatch_("Q"); }
                 skpor { skpmatch_("I"); }
               }
 
-skpdef(lookahead) { skpmatch_("[!&]\4"); }
+skpdef(lookahead) { skpmatch_("[!&]\4");  if (!astfailed) { astretval(astcurptr[-1]); }
+                    skprule_(match); }
 
 skpdef(retval) {
   skpmatch_("?'?'");
@@ -372,6 +373,12 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         repeat = '\0';
       }
 
+      astcase(lookahead) {
+        fprintf(src,"%*sskp%s {%c",indent,skpemptystr,astcurtag == '!' ? "not":"peek",nl); indent+=2;
+        push(1);
+        repeat = '\0';
+      }
+
       astcase(code) {
         char *start = astcurfrom+1; int len = astcurlen-2;
         if (*start == '?') {
@@ -399,7 +406,7 @@ void generatecode(ast_t ast, FILE *src, FILE *hdr, int nl)
         fprintf(src,"}\n");
       }
 
-      astcase(alt_or, alt_once, alt, lookup) {
+      astcase(alt_or, alt_once, alt, lookup, lookahead) {
         rpt = pop();
         while (rpt-- > 0) {indent -=2; fprintf(src,"%*s}%c",indent,skpemptystr,nl); }
       }
