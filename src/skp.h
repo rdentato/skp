@@ -869,6 +869,8 @@ void skp__abort(ast_t ast, char *msg,char *rule);
 #define skpfunc(f)     char *skp_N_ ## f = #f; \
                        int32_t skp_F_ ## f(char **skp_cur)
 
+#define skpreturn(r,k) return ((skpcur = (r)), k)
+
 #define skplookup(f)   skp_fcall(f) \
                        if (!astfailed) switch(astcur->lastinfo)
 

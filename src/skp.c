@@ -5,5 +5,7 @@
 **  https://opensource.org/licenses/MIT
 */
 
+#ifndef SKP_MAIN
 #define SKP_MAIN
+#endif
 #include "skp.h"
