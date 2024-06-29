@@ -10,4 +10,7 @@ pkg:
 	cd examples/skpgen; make -B skpgen
 	cp examples/skpgen/skpgen dist/bin
 
-	
+deps/tng: deps/tng.c
+	cd deps; $(CC) -O3 -Wall -o tng tng.c 
+	strip deps/tng
+

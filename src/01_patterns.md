@@ -1,94 +1,248 @@
-#line 16 "00_header.md"
+# SKP - Patterns
 
-#ifndef SKP_VERSION
-#define SKP_VERSION 0x0004001C
-#define SKP_VERSION_STR "0.4.0"
+## Table of Contents
+- [SKP - Patterns](#skp---patterns)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [The `skp()` function](#the-skp-function)
+    - [Handling non-matched recognizers](#handling-non-matched-recognizers)
+    - [Handling matched recognizers](#handling-matched-recognizers)
+    - [The '\>' modifier](#the--modifier)
 
-#line 76 "00_header.md"
-#include <stdio.h>
-#include <stddef.h>
-#include <ctype.h>
-#include <inttypes.h>
-#include <limits.h>
-#include <errno.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <setjmp.h>
+## Introduction
+  This is the basic functionality of `skp`: matching a string against a pattern.
 
-#line 22 "00_header.md"
-#line 43 "00_header.md"
-// Handle variable and default function arguments.
-// Borrowed from vrg.h but renamed to minimize namespace pollution.
-#define skp_v_cnt(skp_v1,skp_v2,skp_v3,skp_v4,skp_v5,skp_v6,skp_v7,skp_v8,skp_vN, ...) skp_vN
-#define skp_v_argn(...)  skp_v_cnt(__VA_ARGS__, 8, 7, 6, 5, 4, 3, 2, 1, 0)
-#define skp_v_cat0(x,y)  x ## y
-#define skp_v_cat(x,y)   skp_v_cat0(x,y)
-#define skp_vrg(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
+```C
+@("after:Functions")
+  @(":skp auxiliary functions")
+  @(":The skp function")
+```
 
-#line 56 "00_header.md"
-// Borrowed from dbg.h but renamed to minimize namespace pollution.
-#define _skptrace(...)
-#define  skptrace(...) (fprintf(stderr,"%5d ",__LINE__),fprintf(stderr,"TRCE| " __VA_ARGS__), fprintf(stderr, "\x0F : %s\n",__FILE__))
+  In the following we use the following terminology:
+- *recognizer* : a single element of a pattern. For example `d` is a *recognizer
+  for a digit, `'xy'` is the recgnizer for the string `xy`.
+- *pattern* : a sequence of recognizer.
+- *sub-pattern* : a sequence of recognizer within a pattern that ends with
+  a character with ASCII <= 7.
+- *matching text* : the portion of text that matches a certain pattern.
 
-#define _skptest(e_,...) 
-#define  skptest(e_,...) \
-  do { \
-    int tst_=!(e_); \
-    fprintf(stderr,"%s: (%s) \xF%s:%d\n","PASS\0FAIL"+tst_*5, #e_ ,__FILE__,__LINE__); \
-    if (tst_) { fprintf(stderr,"    | " __VA_ARGS__); fputc('\n',stderr); } \
-    errno = tst_; \
-  } while(0)
+## The `skp()` function
 
-#line 23 "00_header.md"
-#line 94 "00_header.md"
-// Just a caution to avoid aggressive optimization.
-extern volatile int skp_zero;
+  The `skp()` function is a variadic function. Some of its parameters
+can be omitted:
 
-#line 24 "00_header.md"
-#line 162 "01_patterns.md"
+- `skp(string,pattern)` : returns 0 if the string doesnot match the pattern (see the [sub-patterns](#Sub_patterns) sections for more details)
+- `skp(string,pattern,end)` : as the previous one but also set `end` (a `char **`) right after the matching substring
+- `skp(string,patterm,start,end)` : as the previous but also sets `start` to the starting of the text that matches
+  this is used in combination with the `>` modifiers for patterns.
+
+ The complexity of this function is due to two factors:
+
+ - **Handling subpatterns**.
+   A pattern may contain sub patterns separated by characters with ASCII code lower that 8. For example
+   the pattern `"'ab'\2 'cd'\3'"` has two *subpatterns* (`'ab'` and `'cd'`) if the strings matches `'ab'`,
+   `skp()` will return `2`, otherwise the patter `'cd'` is tried, if it matches, `skp()` will return `3`
+   otherwise it will return `0` (no match).
+   Note that by default the last subpattern will return `1` if not differently specified.
+
+ - **Handling the `>` modifier**.
+   If a pattern starts with `>`, it is tested across the entire string, not just at the beginning. Note
+   how this is the opposite of what happens with regular expressions where the pattern is always tested
+   across the entire string, unless anchored with `^`.
+   This means that if we fail to match a pattern (i.e. all the subpatterns in a pattern), we have to 
+   move one character ahead in the string and try the entire pattern again.
+
+
+```C
+@("after:Public API")
 int skp_(char *src, char *pat, char **from, char **end);
 
 #define skp(...)    skp_vrg(skp_,__VA_ARGS__)
 #define skp_4(s,p,f,t)  skp_(s, p, f,t)
 #define skp_3(s,p,t)    skp_(s, p, NULL, t)
 #define skp_2(s,p)      skp_(s, p, NULL, NULL)
-#line 847 "02_scanner.md"
+```
 
-typedef struct {
-  char *start;
-  char *to;
-  char *end;
-  int   alt;
-} skp_loop_t;
+```C
+@("after:The skp function")
+int skp_(char *src, char *pat, char **from,char **end)
+{
+  char *start = src;
+  char *s; char *p;
+  char *s_end=NULL; 
+  char *p_end=NULL;
+  int   skp_to = 0;
+  int   matched = 0;
+  int   ret = 0;
+  char *goal = NULL;
+  char *goalnot = NULL;
+  int   flg = 0;
 
-#define skp_1(s) for (skp_loop_t skp_loop = {s,NULL,NULL,1}; \
-                      skpstart && *skpstart && skpalt && !(skpalt = skp_zero);\
-                      s = skpstart = skpto)
+  if (!pat || !src) { return 0; }
 
-#define skpif(p) if (skpalt || !(skpalt = skp_(skpstart,p,&skpto,&skpend))) ; else
+  @(":Record the presence of the > modifier")
 
-#define skpelse  if (skpalt || !(skpend = skpto = skpstart)) ; else
-#define skpstart skp_loop.start
+  p = pat;
+  s = start;
 
-#define skpto    skp_loop.to
-#define skpend   skp_loop.end
-#define skpalt   skp_loop.alt
-#define skplen   skp_loop_len(skp_loop.start,skp_loop.to)
+  // skip over the spaces at the beginning of the pattern (they are useless)
+  while (is_space(*p)) p++;
 
-static inline int skp_loop_len(char *start, char *to)
-{int ret = to-start; return (0 <= ret && ret <= (1<<16)?ret:0);}
+  // Characters below ASCII 0x07, mark the end of a sub pattern (`0x00` marks
+  // the end of the entire pattern string.).
+  // If the current character in the pattern is greater than `0x07`, it means
+  // that we are still in the pattern.
 
-#line 25 "00_header.md"
+  while (*p > '\7') { // Loop over the pattern string
+    
+    matched = match(p,s,&p_end,&s_end,&flg); // Match the next recognizer
 
-  #ifdef SKP_MAIN
-#line 98 "00_header.md"
-volatile int skp_zero = 0;
+    if (matched) {
+      @(":Adjust values for matched recognizer")
+    }
+    else {
+      @(":Handle a non match in the pattern")
+    }
+    while (is_space(*p)) p++; // skip useless spaces in the pattern
+  }
 
-#line 28 "00_header.md"
-#line 121 "01_patterns.md"
-#line 350 "01_patterns.md"
+ _skptrace("pat: '%s'",p);
+
+  if (!matched && goalnot) {
+    goal = goalnot;
+    matched = MATCHED;
+    p="";
+  }
+
+  if (goal) s = goal;
+
+  if (matched && (*p <= '\7')) {
+    ret = (*p > 0)? *p : 1;
+
+    if (from)  *from  = skp_to?start:s;
+    if (end) *end = s;
+    return ret;
+  }
+
+  if (from)  *from  = src;
+  if (end) *end = src;
+  return 0;
+}
+```
+### Handling non-matched recognizers
+
+  There can be three cases to handle if the current recognizer in
+the pattern didn't match:
+
+```C
+  @("after:Handle a non match in the pattern")
+     @(":Look for a new subpattern")
+     @(":Otherwise, handle the > modifier, if set")
+     @(":Otherwise, exit with no match")
+```
+  We first try to find a subpattern:
+
+```C
+     @("after:Look for a new subpattern")
+     _skptrace("notmatched  '%s' '%s'",s,p);
+      // Skip over the current sub-pattern
+      while (*p > '\7') p++;
+     _skptrace("notmatched+ '%s' '%s'",s,p);
+      if ((*p > '\0') && (p[1] > '\0')) { // Try a new pattern
+        s = start;
+        p++;
+       _skptrace("resume from: %s (%c)", p,*s);
+      }
+```
+  If no subpattern can be tested, check if the `>` modifier was set
+and, in case, reset the pattern and advance the start of text by 1:
+
+```C
+     @("after:Otherwise, handle the > modifier, if set")
+      else if (skp_to) {
+        goal = NULL;  goalnot = NULL;
+        p = pat;
+        s = ++start;
+       _skptrace("retry '%s'",s);
+        if (*s == '\0') break;
+      }
+
+```
+  If there is no other subpattern to test and there was
+no `>` modifier set in the pattern, we just exit the loop.
+The variable `matched` will be 0.
+
+```C
+      @("after:Otherwise, exit with no match")
+       else break;
+```
+
+### Handling matched recognizers
+
+  If a recgnizer has been matched, there are things to handle properly.
+The first (and trivial one) is to advance past the recognizer and the matched text:
+
+```C
+ @("before:Adjust values for matched recognizer")
+_skptrace("matched( '%s' '%s'",s,p);
+ s = s_end;
+ p = p_end;
+_skptrace("matched) '%s' '%s'",s,p);
+```
+  The other one is to handle the *goal* of the match.
+  The pattern `&` sets a *goal* in the matched string. For example, if the pattern
+is  `"'ab' &d"`, the string `"ab3"` will match for the portion `ab` because the next
+character is a digit.
+
+  You can think of is as a sort of *look-ahead*. Setting a *goal* is a way to say that
+a string (like `ab` in the example) matches only if what follws also matches a given
+pattern (a digit, in the example above).
+
+  You can specify a *negative* goal (i.e. negative look-ahead) to say that a piece
+of text matches a pattern, unless it is followed by another pattern.
+
+  For example, the string `"ab3"` will **not** match the pattern `"'ab' !&d'"` at all
+because `"ab"` is followed by a digit.
+
+  If the recognizer we just matched was `&`, the `matched` variable holds
+the value `MATCHED_GOAL` and we need to save the current position within the string
+since this is where the end of the actual matching text is (the rest is the *look-ahead*).
+  The same goes for `!&` in which case the value of `matched` would be `MATCHED_GOALNOT`.
+
+  The two variables `goal` and `goalnot` will contain the saved position.
+
+  Note that only the first `&` or `!&` is considered the others are discarded.
+
+```C
+@("after:Adjust values for matched pattern")
+if (matched == MATCHED_GOAL && !goalnot && !goal)
+  goal = s_end;
+else if (matched == MATCHED_GOALNOT && !goalnot && !goal) { 
+  goalnot = s_end; /* skptrace("!GOAL: %.4s",s);*/ 
+}
+```
+
+ ### The '>' modifier
+
+  When a pattern starts with `>` we record it into the `skp_to` variable.
+If it's `1` it means that if we fail, we have to try the pattern on the
+next character.
+
+```C
+@("after:Record the presence of the > modifier")
+_skptrace("SKP_: src:'%s' pat:'%s'",src,pat);
+
+  if (*pat == '>') {
+    skp_to = 1;
+    pat++ ;
+  }
+_skptrace("SKP_: src:'%s' pat:'%s' skp_to:%d",src,pat,skp_to);
+
+```
+
+
+```C
+  @("after:skp auxiliary functions")
 // ************************************************************ 
 // SKIPPING ***************************************************
 // ************************************************************ 
@@ -582,133 +736,4 @@ static int match(char *pat, char *src, char **pat_end, char **src_end,int *flg)
 }
 
 
-#line 122 "01_patterns.md"
-#line 172 "01_patterns.md"
-int skp_(char *src, char *pat, char **from,char **end)
-{
-  char *start = src;
-  char *s; char *p;
-  char *s_end=NULL; 
-  char *p_end=NULL;
-  int   skp_to = 0;
-  int   matched = 0;
-  int   ret = 0;
-  char *goal = NULL;
-  char *goalnot = NULL;
-  int   flg = 0;
-
-  if (!pat || !src) { return 0; }
-
-#line 337 "01_patterns.md"
-_skptrace("SKP_: src:'%s' pat:'%s'",src,pat);
-
-  if (*pat == '>') {
-    skp_to = 1;
-    pat++ ;
-  }
-_skptrace("SKP_: src:'%s' pat:'%s' skp_to:%d",src,pat,skp_to);
-
-#line 188 "01_patterns.md"
-
-  p = pat;
-  s = start;
-
-  // skip over the spaces at the beginning of the pattern (they are useless)
-  while (is_space(*p)) p++;
-
-  // Characters below ASCII 0x07, mark the end of a sub pattern (`0x00` marks
-  // the end of the entire pattern string.).
-  // If the current character in the pattern is greater than `0x07`, it means
-  // that we are still in the pattern.
-
-  while (*p > '\7') { // Loop over the pattern string
-    
-    matched = match(p,s,&p_end,&s_end,&flg); // Match the next recognizer
-
-    if (matched) {
-#line 291 "01_patterns.md"
-_skptrace("matched( '%s' '%s'",s,p);
- s = s_end;
- p = p_end;
-_skptrace("matched) '%s' '%s'",s,p);
-#line 206 "01_patterns.md"
-    }
-    else {
-#line 243 "01_patterns.md"
-#line 251 "01_patterns.md"
-     _skptrace("notmatched  '%s' '%s'",s,p);
-      // Skip over the current sub-pattern
-      while (*p > '\7') p++;
-     _skptrace("notmatched+ '%s' '%s'",s,p);
-      if ((*p > '\0') && (p[1] > '\0')) { // Try a new pattern
-        s = start;
-        p++;
-       _skptrace("resume from: %s (%c)", p,*s);
-      }
-#line 244 "01_patterns.md"
-#line 266 "01_patterns.md"
-      else if (skp_to) {
-        goal = NULL;  goalnot = NULL;
-        p = pat;
-        s = ++start;
-       _skptrace("retry '%s'",s);
-        if (*s == '\0') break;
-      }
-
-#line 245 "01_patterns.md"
-#line 281 "01_patterns.md"
-       else break;
-#line 246 "01_patterns.md"
-#line 209 "01_patterns.md"
-    }
-    while (is_space(*p)) p++; // skip useless spaces in the pattern
-  }
-
- _skptrace("pat: '%s'",p);
-
-  if (!matched && goalnot) {
-    goal = goalnot;
-    matched = MATCHED;
-    p="";
-  }
-
-  if (goal) s = goal;
-
-  if (matched && (*p <= '\7')) {
-    ret = (*p > 0)? *p : 1;
-
-    if (from)  *from  = skp_to?start:s;
-    if (end) *end = s;
-    return ret;
-  }
-
-  if (from)  *from  = src;
-  if (end) *end = src;
-  return 0;
-}
-#line 123 "01_patterns.md"
-#line 29 "00_header.md"
-  #endif // SKP_MAIN
-
-
-#endif // SKP_VERSION
-
-#line 42 "00_header.md"
-#line 55 "00_header.md"
-#line 75 "00_header.md"
-#line 93 "00_header.md"
-#line 120 "01_patterns.md"
-#line 161 "01_patterns.md"
-#line 171 "01_patterns.md"
-#line 242 "01_patterns.md"
-#line 250 "01_patterns.md"
-#line 265 "01_patterns.md"
-#line 280 "01_patterns.md"
-#line 290 "01_patterns.md"
-#line 321 "01_patterns.md"
-#line 336 "01_patterns.md"
-#line 349 "01_patterns.md"
-#line 846 "02_scanner.md"
-#line 875 "03_parser.md"
-#line 930 "03_parser.md"
-
+```
