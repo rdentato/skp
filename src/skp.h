@@ -45,18 +45,18 @@
   } while(0)
 
 #line 23 "00_header.md"
-#line 257 "10_patterns.md"
+#line 254 "10_patterns.md"
 #define SKP_MAXPATTERNS 5
 
 #line 98 "00_header.md"
 // Just a caution to avoid aggressive optimization.
 extern volatile int skp_zero;
 
-#line 67 "10_patterns.md"
+#line 64 "10_patterns.md"
 extern char *skp_writeonly_charptr;
 
 #line 24 "00_header.md"
-#line 73 "10_patterns.md"
+#line 70 "10_patterns.md"
 typedef int (*skp_funcpattern_t)(char *, char**, char **);
 
 #define skprecognizer(recog) \
@@ -74,7 +74,7 @@ typedef struct {
 #define skplen(n) skp_len(n,skpfrom, skpto)
 static inline int skp_len(int n, char **from, char **to) { return to[n] - from[n];}
 
-#line 79 "10_patterns.md"
+#line 76 "10_patterns.md"
 
 int skp_f(char *txt, skp_funcpattern_t f, char **from,char **end);
 int skp_s(char *txt, char *pat, char **from,char **end);
@@ -92,7 +92,7 @@ int skp_p(char *txt, void *p, char **from,char **end);
                                   int: skp_n, \
                                void *: skp_p  \
                                               )(s,p,f,t)
-#line 260 "10_patterns.md"
+#line 257 "10_patterns.md"
 #define skp_type(x) _Generic((x),char *: 'S', skp_funcpattern_t: 'F', void *: 'P', default: '\0')
 
 typedef void *skp_voidptr;
@@ -116,7 +116,7 @@ int skp_multi(char *text,char **from, char **to, char *types, void **ptrns);
                 (skp_voidptr []){(void *)p1, (void *)p2, (void *)p3, (void *)p4, (void *)p5})
 
 
-#line 999 "10_patterns.md"
+#line 567 "15_match.md"
 
 uint32_t skp_next(char *text,char **end,int iso);
 
@@ -167,18 +167,18 @@ static inline int skp_sel(int m, int n) { return n; }
 #line 102 "00_header.md"
 volatile int skp_zero = 0;
 
-#line 70 "10_patterns.md"
+#line 67 "10_patterns.md"
 char *skp_writeonly_charptr; // Write only!
 
 #line 28 "00_header.md"
-#line 22 "10_patterns.md"
-#line 458 "10_patterns.md"
+#line 19 "10_patterns.md"
+#line 26 "15_match.md"
 #define MATCHED_FAIL    0 
 #define MATCHED         1
 #define MATCHED_GOAL    2
 #define MATCHED_GOALNOT 3
-#line 23 "10_patterns.md"
-#line 731 "10_patterns.md"
+#line 20 "10_patterns.md"
+#line 299 "15_match.md"
 // ************************************************************ 
 // SKIPPING ***************************************************
 // ************************************************************ 
@@ -415,11 +415,11 @@ static uint32_t get_qclose(uint32_t open)
    return 0;
 }
 
-#line 24 "10_patterns.md"
-#line 447 "10_patterns.md"
+#line 21 "10_patterns.md"
+#line 15 "15_match.md"
 // skp() needs to know about mathc()
 static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg);
-#line 101 "10_patterns.md"
+#line 98 "10_patterns.md"
 int skp_f(char *txt, skp_funcpattern_t f, char **from,char **end)
 {
   char *local_from = txt;
@@ -463,7 +463,7 @@ int skp_p(char *txt, void *p, char **from,char **end)
   *end = txt;
   return 1;
 }
-#line 148 "10_patterns.md"
+#line 145 "10_patterns.md"
 int skp_s(char *txt, char *pat, char **from,char **end)
 {
   char *start = txt;
@@ -475,15 +475,15 @@ int skp_s(char *txt, char *pat, char **from,char **end)
   int   ret = 0;
   int   flg = 0; // By default: Case sensitive comparison and UTF-8 encoding
 
-#line 412 "10_patterns.md"
+#line 409 "10_patterns.md"
   char *goal = NULL;
   char *goalnot = NULL;
 
-#line 160 "10_patterns.md"
+#line 157 "10_patterns.md"
 
   if (!pat || !txt) { return 0; }
 
-#line 431 "10_patterns.md"
+#line 428 "10_patterns.md"
 _skptrace("SKP_: txt:'%s' pat:'%s'",txt,pat);
 
   if (*pat == '>') {
@@ -492,7 +492,7 @@ _skptrace("SKP_: txt:'%s' pat:'%s'",txt,pat);
   }
 _skptrace("SKP_: txt:'%s' pat:'%s' skp_to:%d",txt,pat,skp_to);
 
-#line 164 "10_patterns.md"
+#line 161 "10_patterns.md"
 
   p = pat;
   s = start;
@@ -511,16 +511,16 @@ _skptrace("SKP_: txt:'%s' pat:'%s' skp_to:%d",txt,pat,skp_to);
     matched = match(p,s,&p_end,&s_end,&flg); 
 
     if (matched) {
-#line 381 "10_patterns.md"
+#line 378 "10_patterns.md"
 _skptrace("matched( '%s' '%s'",s,p);
  s = s_end;
  p = p_end;
 _skptrace("matched) '%s' '%s'",s,p);
-#line 183 "10_patterns.md"
+#line 180 "10_patterns.md"
     }
     else {
-#line 332 "10_patterns.md"
-#line 340 "10_patterns.md"
+#line 329 "10_patterns.md"
+#line 337 "10_patterns.md"
      _skptrace("notmatched  '%s' '%s'",s,p);
       // Skip over the current sub-pattern
       while (*p > '\7') p++;
@@ -530,8 +530,8 @@ _skptrace("matched) '%s' '%s'",s,p);
         p++;
        _skptrace("resume from: %s (%c)", p,*s);
       }
-#line 333 "10_patterns.md"
-#line 355 "10_patterns.md"
+#line 330 "10_patterns.md"
+#line 352 "10_patterns.md"
       else if (skp_to) {
         goal = NULL;  goalnot = NULL;
         p = pat;
@@ -541,18 +541,18 @@ _skptrace("matched) '%s' '%s'",s,p);
         if (*s == '\0') break;
       }
 
-#line 334 "10_patterns.md"
-#line 371 "10_patterns.md"
+#line 331 "10_patterns.md"
+#line 368 "10_patterns.md"
        else break;
-#line 335 "10_patterns.md"
-#line 186 "10_patterns.md"
+#line 332 "10_patterns.md"
+#line 183 "10_patterns.md"
     }
     while (is_space(*p)) p++; // skip useless spaces in the pattern
   }
 
  _skptrace("pat: '%s'",p);
 
-#line 208 "10_patterns.md"
+#line 205 "10_patterns.md"
   if (!matched && goalnot) {
     goal = goalnot;
     matched = MATCHED;
@@ -561,8 +561,8 @@ _skptrace("matched) '%s' '%s'",s,p);
   }
 
   if (goal) s = goal; // Move back the end of the string to the goal
-#line 193 "10_patterns.md"
-#line 224 "10_patterns.md"
+#line 190 "10_patterns.md"
+#line 221 "10_patterns.md"
   if (matched) { 
     ret = "\1\1\2\3\4\5\6\7"[(int)(*p) & 0x07]; // 0 defaults to 1
 
@@ -575,12 +575,12 @@ _skptrace("matched) '%s' '%s'",s,p);
     // *end  = txt;
   }
 
-#line 194 "10_patterns.md"
+#line 191 "10_patterns.md"
 
   return ret;
 }
-#line 25 "10_patterns.md"
-#line 284 "10_patterns.md"
+#line 22 "10_patterns.md"
+#line 281 "10_patterns.md"
 int skp_multi(char *text,char **from, char **to, char *types, void **ptrns)
 {
  _skptrace("MULTI TYPES: %s",types);
@@ -620,8 +620,8 @@ int skp_multi(char *text,char **from, char **to, char *types, void **ptrns)
   return ret;
 }
 
-#line 26 "10_patterns.md"
-#line 482 "10_patterns.md"
+#line 23 "10_patterns.md"
+#line 50 "15_match.md"
 static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg)
 {
   uint32_t s_chr;
@@ -867,9 +867,9 @@ static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg)
   return ret;
 }
 
-#line 27 "10_patterns.md"
+#line 24 "10_patterns.md"
 
-#line 1012 "10_patterns.md"
+#line 580 "15_match.md"
 
 uint32_t skp_next(char *text,char **end,int iso)
 {
@@ -895,7 +895,7 @@ uint32_t skp_next(char *text,char **end,int iso)
       }
 #endif
     }
-#line 1038 "10_patterns.md"
+#line 606 "15_match.md"
   }
 
  _skptrace("next: %08X iso: %d",c,iso);
@@ -913,26 +913,26 @@ uint32_t skp_next(char *text,char **end,int iso)
 #line 59 "00_header.md"
 #line 79 "00_header.md"
 #line 97 "00_header.md"
-#line 21 "10_patterns.md"
-#line 66 "10_patterns.md"
-#line 100 "10_patterns.md"
-#line 147 "10_patterns.md"
-#line 207 "10_patterns.md"
-#line 223 "10_patterns.md"
-#line 256 "10_patterns.md"
-#line 331 "10_patterns.md"
-#line 339 "10_patterns.md"
-#line 354 "10_patterns.md"
-#line 370 "10_patterns.md"
-#line 380 "10_patterns.md"
-#line 411 "10_patterns.md"
-#line 430 "10_patterns.md"
-#line 446 "10_patterns.md"
-#line 457 "10_patterns.md"
-#line 481 "10_patterns.md"
-#line 730 "10_patterns.md"
-#line 998 "10_patterns.md"
-#line 1055 "10_patterns.md"
+#line 18 "10_patterns.md"
+#line 63 "10_patterns.md"
+#line 97 "10_patterns.md"
+#line 144 "10_patterns.md"
+#line 204 "10_patterns.md"
+#line 220 "10_patterns.md"
+#line 253 "10_patterns.md"
+#line 328 "10_patterns.md"
+#line 336 "10_patterns.md"
+#line 351 "10_patterns.md"
+#line 367 "10_patterns.md"
+#line 377 "10_patterns.md"
+#line 408 "10_patterns.md"
+#line 427 "10_patterns.md"
+#line 14 "15_match.md"
+#line 25 "15_match.md"
+#line 49 "15_match.md"
+#line 298 "15_match.md"
+#line 566 "15_match.md"
+#line 623 "15_match.md"
 #line 85 "20_scanner.md"
 
 #line 116 "20_scanner.md"
