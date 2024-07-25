@@ -110,14 +110,17 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-echo "output: $OUTFILE ($WILDCARD)"
+rm -f temp.log
 echo "STIME `date`" > $OUTFILE
-find . -name "t_$WILDCARD" -print | sed -e '/\.c$/d' -e '/\.cpp$/d' -e '/\.o$/d' | while read -r f ; do $f $COLOR $TAGS $* ; done 2>> $OUTFILE
+find . -name "t_$WILDCARD" -print | sed -e '/\.c$/d' -e '/\.cpp$/d' -e '/\.o$/d' | while read -r f ; do $f $COLOR $TAGS $* ; done 2>> temp.log
+echo "ETIME `date`" >> $OUTFILE
 
-FAIL=`grep '^[0-9 ]*FAIL' $OUTFILE | wc -l`
-PASS=`grep '^[0-9 ]*PASS' $OUTFILE | wc -l`
-SKIP=`grep '^[0-9 ]*SKIP' $OUTFILE | wc -l`
+FAIL=`grep '^[0-9 ]*FAIL' temp.log | wc -l`
+PASS=`grep '^[0-9 ]*PASS' temp.log | wc -l`
+SKIP=`grep '^[0-9 ]*SKIP' temp.log | wc -l`
 
 echo "TOTAL $COLOR_RED$FAIL FAIL$COLOR_NONE | $COLOR_GREEN$PASS PASS$COLOR_NONE | $COLOR_YELLOW$SKIP SKIP$COLOR_NONE" >> $OUTFILE
+cat temp.log >> test.log
+rm -f temp.log
+echo "output: $OUTFILE ($WILDCARD)"
 
-echo "ETIME `date`" >> $OUTFILE

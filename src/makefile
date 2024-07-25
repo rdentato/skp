@@ -1,6 +1,7 @@
-SRC=01_patterns.md 02_scanner.md 03_parser.md
+SRC=10_patterns.md 20_scanner.md 
+TNG=../deps/tng
 
 skp.h: 00_header.md $(SRC)
-	../deps/tng -o skp.h 00_header.md $(SRC)
+	$(TNG) -o skp.h 00_header.md $(SRC)
 
 

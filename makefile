@@ -1,14 +1,10 @@
 
-skpgen:
-	cd examples/skpgen; make
 
-pkg:
-	rm -rf dist
-	mkdir -p dist/bin
-	mkdir -p dist/src
-	cp src/skp.[ch] dist/src
-	cd examples/skpgen; make -B skpgen
-	cp examples/skpgen/skpgen dist/bin
+distr:
+	rm -rf distr
+	mkdir -p distr/bin
+	mkdir -p distr/src
+	cp src/skp.[ch] distr/src
 
 deps/tng: deps/tng.c
 	cd deps; $(CC) -O3 -Wall -o tng tng.c 

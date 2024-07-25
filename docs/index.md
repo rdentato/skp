@@ -340,7 +340,9 @@ For example, a simple CSV reader can be implemented with:
                      }
      last = skpto; // Store position
    }
-   if (*last != '\0') { // abnormal exit }
+   if (*last != '\0') { 
+     // abnormal exit
+   }
 ```
 
 ## Level 3: Parsing

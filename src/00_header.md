@@ -28,6 +28,7 @@
     @(":Functions")
   #endif // SKP_MAIN
 
+  
 
 #endif // SKP_VERSION
 
@@ -47,6 +48,9 @@ Visit the [`vrg` library](https://github.com/rdentato/vrg) site for more informa
 #define skp_v_cat0(x,y)  x ## y
 #define skp_v_cat(x,y)   skp_v_cat0(x,y)
 #define skp_vrg(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
+
+#define skp_VRG(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
+#define skp_Vrg(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
 
 ```
 
