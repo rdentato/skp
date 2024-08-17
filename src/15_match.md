@@ -108,6 +108,7 @@ static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg)
       case '@' : W(is_alnum(s_chr));  break;
       
       case '&' : ret = match_not? MATCHED_GOALNOT : MATCHED_GOAL;
+                 s_end = txt;
                  break;
 
       case '[' : W(is_oneof(s_chr,pat,*flg & 2));
@@ -116,20 +117,69 @@ static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg)
                  pat++;
                  break;
 
+      // case '`' : { _skptrace("STRING: %s",s_end);
+      //              char *end = s_end;
+      //              while (*pat && *end && (*pat == *end)) {end++; pat++;}
+      //             
+      //              if (*pat == '\0') {
+      //                if (!match_not) {
+      //                 s_end = end;
+      //                 ret = MATCHED;
+      //                }
+      //              }
+      //              else if (match_min == 0 || match_not)
+      //                ret = MATCHED;
+      //              
+      //              while(*pat) pat++;
+      //              break;
+      //            }
+
+      // case '"' : case '\'': case '`': {
+      //              int l = 0; int ml ; uint32_t quote = pat[-1];
+      //              if (quote == '`') quote = '\0';
+      //              while (pat[l] && pat[l] != quote) l++;
+      //             _skptrace("STRING: '%s' PAT: '%s' %d",s_end,pat,l);
+      //              if (l>0 && ((ml=is_string(s_end,pat,l,*flg)) > 0)) {
+      //                if (!match_not) {
+      //                  s_end += ml;
+      //                  ret = MATCHED;
+      //                }
+      //              }
+      //              else if (match_min == 0 || match_not) 
+      //                     ret = MATCHED;
+      //              pat += l+(quote?1:0);
+      //              break;  
+      //            }
+
       case '"' : case '\'': case '`': {
-                 int l = 0; int ml ; uint32_t quote = pat[-1];
-                 while (pat[l] && pat[l] != quote) l++;
-                 if (l>0 && ((ml=is_string(s_end,pat,l,*flg)) > 0)) {
-                   if (!match_not) {
-                     s_end += ml;
-                     ret = MATCHED;
+                   int k = 0; uint32_t quote = pat[-1];
+                   if (quote == '`') quote = '\0';
+                   while (1) {
+                     if (*pat == '\0' || *pat == quote || *pat == '\xE') {
+                       ret = MATCHED; 
+                       break; 
+                     }
+                     if (*pat == s_end[k]) { pat++; k++; }
+                     else { // find another option
+                       k = 0;
+                       while (*pat && *pat != quote && *pat != '\xE')
+                         pat++;
+                       if (*pat != '\xE') 
+                         break;
+                       pat++;
+                     }
                    }
+                   if (ret) {
+                     if (match_not) ret = 0;
+                     else s_end += k;
+                   }
+                   else if (match_min == 0 || match_not) 
+                          ret = MATCHED;
+                   while (*pat && *pat != quote) pat++;
+                   if (*pat) pat++;
+                   break;  
                  }
-                 else if (match_min == 0 || match_not) ret = MATCHED;
-                 pat += l+1;
-                 break;  
-               }
-    
+
       case 'C' : *flg = (*flg & ~1) | match_not; ret = MATCHED;
                 _skptrace("FOLD: %d",*flg & 1);
                  break;
@@ -164,10 +214,7 @@ static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg)
                    } while (is_alnum(s_chr) || (s_chr == '_'));
                    ret = MATCHED;
                  } 
-                 if (match_not) {
-                   ret = !ret;
-                   s_end = txt;
-                 }
+                 if (match_not) {ret = !ret; s_end = txt; }
                  break;
 
       case '(' : if (*pat != ')') break;
@@ -286,6 +333,7 @@ static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg)
     p_end = pat;
 
   if (ret != MATCHED_FAIL) {
+    if (match_not) s_end = txt;
     if (pat_end) *pat_end = p_end;
     if (txt_end) *txt_end = s_end;
   }
@@ -344,14 +392,14 @@ static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg)
    & the character '&'
 */
 
-static int chr_cmp(uint32_t a, uint32_t b, int fold)
-{ _skptrace("CMP: %d %c %c",fold, a,b);
-  if (fold && a <= 0x7F && b <= 0x7F) {
-    a = tolower(a);
-    b = tolower(b);
-  }
-  return (a == b);
-}
+// static int chr_cmp(uint32_t a, uint32_t b, int fold)
+// { _skptrace("CMP: %d %c %c",fold, a,b);
+//   if (fold && a <= 0x7F && b <= 0x7F) {
+//     a = tolower(a);
+//     b = tolower(b);
+//   }
+//   return (a == b);
+// }
 
 static int is_blank(uint32_t c)
 {
@@ -479,37 +527,37 @@ static int is_oneof(uint32_t ch, char *set, int iso)
   return 0;
 }
 
-static int is_string(char *s, char *p, int len, int flg)
-{
-  char *start = s;
-  uint32_t p_chr,s_chr;
-  char *p_end, *s_end;
-  int mlen = 0;
- _skptrace("STR: %d '%s' '%.*s'",len,s,len,p);
-  while (len) {
-   _skptrace("ALT: %d '%s' '%s'",len, p,s);
-    if (*p == '\xE') return mlen;
-
-    p_chr = skp_next(p,&p_end,flg & 2);
-    s_chr = skp_next(s,&s_end,flg & 2);
-
-    if (chr_cmp(s_chr,p_chr,flg & 1)) {
-      mlen += (int)(s_end - s);
-      len  -= (int)(p_end - p);
-      //if (*s_end == '\0') return mlen;
-      p = p_end;  s = s_end;
-    }
-    else {
-      while (len>0 && *p++ != '\xE') len--; // search for an alternative
-      if (len-- <= 0) return 0;
-      s = start;
-      mlen = 0;
-     _skptrace("ALT2: %d p:'%.*s' s:'%s'",len,len,p,s);
-    }
-  }
- _skptrace("MRET: %d",mlen);
-  return mlen;
-}
+// static int is_string(char *s, char *p, int len, int flg)
+// {
+//   char *start = s;
+//   uint32_t p_chr,s_chr;
+//   char *p_end, *s_end;
+//   int mlen = 0;
+//  _skptrace("STR: %d '%s' '%.*s'",len,s,len,p);
+//   while (len) {
+//    _skptrace("ALT: %d '%s' '%s'",len, p,s);
+//     if (*p == '\xE') return mlen;
+// 
+//     p_chr = skp_next(p,&p_end,flg & 2);
+//     s_chr = skp_next(s,&s_end,flg & 2);
+// 
+//     if (chr_cmp(s_chr,p_chr,flg & 1)) {
+//       mlen += (int)(s_end - s);
+//       len  -= (int)(p_end - p);
+//       //if (*s_end == '\0') return mlen;
+//       p = p_end;  s = s_end;
+//     }
+//     else {
+//       while (len>0 && *p++ != '\xE') len--; // search for an alternative
+//       if (len-- <= 0) return 0;
+//       s = start;
+//       mlen = 0;
+//      _skptrace("ALT2: %d p:'%.*s' s:'%s'",len,len,p,s);
+//     }
+//   }
+//  _skptrace("MRET: %d",mlen);
+//   return mlen;
+// }
 
 static uint32_t get_close(uint32_t open)
 {

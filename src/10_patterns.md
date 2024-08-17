@@ -61,16 +61,24 @@ can be omitted:
 
 ```C
 @("after:Global Declarations")
-extern char *skp_writeonly_charptr;
+extern char *skpfrom[SKP_MAXPATTERNS]; // Write only!
+extern char *skpto[SKP_MAXPATTERNS]; // Write only!
+//extern char *skpstart;
+//extern int   skpmatched;
 
 @("after:Global Variables")
-char *skp_writeonly_charptr; // Write only!
+char *skpfrom[SKP_MAXPATTERNS]; // Write only!
+char *skpto[SKP_MAXPATTERNS]; // Write only!
+// char *skpstart = NULL;
+// int   skpmatched = 0;
 
-@("before: Public API")
-typedef int (*skp_funcpattern_t)(char *, char**, char **);
+@("after: Global Declarations")
+typedef int (*skp_funcpattern_t)(char *, char**, char **, int);
 
 #define skprecognizer(recog) \
-   int recog(char *skpstart, char **skpfrom, char **skpto)
+   int recog(char *skpstart, char **skpfrom, char **skpto, int skpmatched)
+
+#define skpdef(x) skprecognizer(x)
 
 @("after:Public API")
 
@@ -79,77 +87,80 @@ int skp_s(char *txt, char *pat, char **from,char **end);
 int skp_n(char *txt, int n, char **from,char **end);
 int skp_p(char *txt, void *p, char **from,char **end);
 
-#define skp(...)    skp_vrg(skp_,__VA_ARGS__)
-#define skp_4(s,p,f,t)  skp_(s, p, f,    t)
-#define skp_3(s,p,t)    skp_(s, p, &skp_writeonly_charptr, t)
-#define skp_2(s,p)      skp_(s, p, &skp_writeonly_charptr, &skp_writeonly_charptr)
+#define skp(...) skp_vrg(skp_,__VA_ARGS__)
+#define skp_2(s,p)     skp_(s, p, skpfrom, skpto)
+#define skp_3(s,p,t)   skp_(s, p, skpfrom, t    )
+#define skp_4(s,p,f,t) skp_(s, p, f,       t    )
 
-#define skp_(s,p,f,t) _Generic((p), \
-                               char *: skp_s, \
-                    skp_funcpattern_t: skp_f, \
-                                  int: skp_n, \
-                               void *: skp_p  \
-                                              )(s,p,f,t)
+#define skp_(s,p,f,t) _Generic((p),\
+                     char *: skp_s,\
+          skp_funcpattern_t: skp_f,\
+                        int: skp_n,\
+                     void *: skp_p ) (s,p,f,t)
+
 ```
-
 
 ```C
 @("after:The skp function")
-int skp_f(char *txt, skp_funcpattern_t f, char **from,char **end)
+int skp_f(char *txt, skp_funcpattern_t f, char **from,char **to)
 {
-  char *local_from = txt;
-  char *local_end = txt;
+  char *local_from[SKP_MAXPATTERNS];
+  char *local_to[SKP_MAXPATTERNS];
   int ret = 0;
+  local_from[0] = txt;
+  local_to[0] = txt;
  _skptrace("skp_t: %s",txt);
   if (txt != NULL && f != NULL) {
-    ret = f(txt,&local_from,&local_end);
-    if (ret) {
-      *from = local_from;
-      *end = local_end;
+    ret = f(txt,local_from,local_to,1);
+    if (ret) {   // Only from[0] and to[0] are updated
+      if (from) *from = local_from[0];
+      if (to) *to = local_to[0];
     }
   }
-  return ret & '\7'; // ensure return value is <= 7
+  return (ret & '\7'); // ensure return value is <= 7
 }
 
-int skp_n(char *txt, int n, char **from,char **end)
+int skp_n(char *txt, int n, char **from,char **to)
 {
-  char *local_end = txt;
+  char *local_to = txt;
   int iso=0;
-  
+  int ret = 0;
+
   if (n<0) { n = -n; iso = 1; }
 
-  while (n && *local_end) {
+  while (n && *local_to) {
     n--;
-    skp_next(local_end,&local_end,iso);
-   _skptrace("N: %d %s %p %p",n,local_end,local_end,end);
+    skp_next(local_to,&local_to,iso);
+   _skptrace("N: %d %s %p %p",n,local_to,local_to,to);
   }
 
-  if (n>0) return 0;
+  if (n <= 0) {
+    if (from) *from = txt;
+    if (to) *to = local_to;
+    ret = 1;
+  }
 
-  *from = txt;
-  *end = local_end;
-
-  return 1;
+  return ret;
 }
 
-int skp_p(char *txt, void *p, char **from,char **end)
+int skp_p(char *txt, void *p, char **from,char **to)
 {
-  *from = txt;
-  *end = txt;
-  return 1;
+  if (from) *from = txt;
+  if (to) *to = txt;
+  return (1);
 }
 ```
 
 ```C
 @("after:The skp function")
-int skp_s(char *txt, char *pat, char **from,char **end)
+int skp_s(char *txt, char *pat, char **from,char **to)
 {
   char *start = txt;
   char *s; char *p;
   char *s_end=NULL; 
   char *p_end=NULL;
   int   skp_to = 0;
-  int   matched = 0;
+  int   matched = 1;
   int   ret = 0;
   int   flg = 0; // By default: Case sensitive comparison and UTF-8 encoding
 
@@ -189,7 +200,7 @@ int skp_s(char *txt, char *pat, char **from,char **end)
   @(":Fix the goal")
   @(":Fix return values")
 
-  return ret;
+  return (ret);
 }
 ```
   If a goal ha been set, the end of the matching string is brought
@@ -221,13 +232,13 @@ to `0` if there was no match).
   if (matched) { 
     ret = "\1\1\2\3\4\5\6\7"[(int)(*p) & 0x07]; // 0 defaults to 1
 
-    *from = start;
-    *end  = s;
+    if (from) *from = start;
+    if (to) *to  = s;
   }
   else {
     ret = 0;
     // *from = txt;
-    // *end  = txt;
+    // *to  = txt;
   }
 
 ```
@@ -250,11 +261,30 @@ pairs `from[1]` and `to[1]` the boundaries of the match for the first pattern an
 
 
 ```C
+
+@("after:Global types")
+typedef struct {int x;} *skp_goal_t;
+typedef struct {int y;} *skp_goalnot_t;
+
+
 @("before:Global Declarations")
-#define SKP_MAXPATTERNS 5
+extern skp_goal_t    skpgoal;
+extern skp_goalnot_t skpnot;
+
+#define SKP_MAXPATTERNS 6
+
+@("after:Global Variables")
+skp_goal_t    skpgoal;
+skp_goalnot_t skpnot;
 
 @("after:Public API")
-#define skp_type(x) _Generic((x),char *: 'S', skp_funcpattern_t: 'F', void *: 'P', default: '\0')
+#define skp_type(x) _Generic((x),char *: 'S', \
+                      skp_funcpattern_t: 'F', \
+                             skp_goal_t: 'G', \
+                          skp_goalnot_t: '!', \
+                                 void *: 'P', \
+                                   int : 'N', \
+                                default: '\0')
 
 typedef void *skp_voidptr;
 
@@ -276,6 +306,9 @@ int skp_multi(char *text,char **from, char **to, char *types, void **ptrns);
     skp_multi(txt,f,t, (char []){skp_type(p1),skp_type(p2),skp_type(p3),skp_type(p4),skp_type(p5),'\0'},\
                 (skp_voidptr []){(void *)p1, (void *)p2, (void *)p3, (void *)p4, (void *)p5})
 
+#define skp_9(txt,p1,p2,p3,p4,p5,p6,f,t) \
+    skp_multi(txt,f,t, (char []){skp_type(p1),skp_type(p2),skp_type(p3),skp_type(p4),skp_type(p5),skp_type(p6),'\0'},\
+                (skp_voidptr []){(void *)p1, (void *)p2, (void *)p3, (void *)p4, (void *)p5, (void *)p6})
 
 @("after:The skp_multi function")
 int skp_multi(char *text,char **from, char **to, char *types, void **ptrns)
@@ -283,38 +316,62 @@ int skp_multi(char *text,char **from, char **to, char *types, void **ptrns)
  _skptrace("MULTI TYPES: %s",types);
   char *tmp_from[SKP_MAXPATTERNS];
   char *tmp_to[SKP_MAXPATTERNS];
+  char *goal = NULL;
+  char *goalnot = NULL;
+
   int n = 0;
   int ret = 0;
   while(n < SKP_MAXPATTERNS && types[n]) {
+   _skptrace("Multi text: %s",text);
     switch (types[n]) {
       case 'S' : ret = skp_s(text,(char *)(ptrns[n]), tmp_from+n, tmp_to+n);
-                 if (ret == 0) return 0;
                 _skptrace("S: %d %d %p %p %p %p",n,ret,tmp_from+n,tmp_to+n,tmp_from[n],tmp_to[n]);
                  break;
       case 'F' : ret = skp_f(text, (skp_funcpattern_t)(ptrns[n]), tmp_from+n, tmp_to+n);
-                 if (ret == 0) return 0;
                 _skptrace("F: %d %d %p %p %p %p",n,ret,tmp_from+n,tmp_to+n,tmp_from[n],tmp_to[n]);
                  break;
       case 'P' : ret = skp_p(text, ptrns[n], tmp_from+n, tmp_to+n);
-                 if (ret == 0) return 0;
                 _skptrace("P: %d %d %p %p %p %p",n,ret,tmp_from+n,tmp_to+n,tmp_from[n],tmp_to[n]);
                  break;
-                
+      case 'N' : ret = skp_n(text, (int)((intptr_t)(ptrns[n])), tmp_from+n, tmp_to+n);
+                _skptrace("N: %d %d %p %p %p %p",n,ret,tmp_from+n,tmp_to+n,tmp_from[n],tmp_to[n]);
+                 break;
+      case 'G' : if (goal || goalnot) return 0;
+                 ret = 1; goal = text;
+                 tmp_from[n] = tmp_to[n] = goal;
+                 break;
+      case '!' : if (goal || goalnot) return 0;
+                 ret = 1; goalnot = text;
+                 tmp_from[n] = tmp_to[n] = goalnot;
+                 break;
       default : return 0;
     }
+
+    if (ret == 0) break;
+
     text = tmp_to[n];
     n++;
   }
-  if (n == 0) return 0;
-  from[0] = tmp_from[0];
-  to[0]   = tmp_to[n-1];
-  while (n>0) {
-    from[n] = tmp_from[n-1];
-    to[n] = tmp_to[n-1];
-    n -= 1;
+
+  if (goalnot) {
+    ret = !ret;
+    goal = goalnot;
   }
 
-  return ret;
+  if (ret) {
+    if (from) {
+      from[0] = tmp_from[0];
+      for (int k = n; k>0; k--)
+        from[k] = tmp_from[k-1];
+    }
+    if (to) {
+      to[0]   = goal? goal : tmp_to[n-1];
+      for (int k = n; k>0; k--)
+        to[k] = tmp_to[k-1];
+    }
+  }
+
+  return (ret);
 }
 
 ```
@@ -409,11 +466,12 @@ since this is where the end of the actual matching text is (the rest is the *loo
   char *goal = NULL;
   char *goalnot = NULL;
 
-@("after:Adjust values for matched pattern")
-if (matched == MATCHED_GOAL && !goalnot && !goal)
-  goal = s_end;
+@("after:Adjust values for matched recognizer")
+if (matched == MATCHED_GOAL && !goalnot && !goal) {
+  goal = s_end;  skptrace("GOAL: %.4s",s_end);
+}
 else if (matched == MATCHED_GOALNOT && !goalnot && !goal) { 
-  goalnot = s_end; /* skptrace("!GOAL: %.4s",s);*/ 
+  goalnot = s_end; skptrace("!GOAL: %.4s",s_end);
 }
 ```
 

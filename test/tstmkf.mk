@@ -20,8 +20,8 @@ ifeq "$(COMSPEC)" ""
 _EXE=
 STATIC=
 endif
-
-CFLAGS=-O2 -Wall -I$(SRCDIR) -I. -I$(DEPSDIR) $(STATIC) $(COMPACT) $(DEBUG)
+DEBUG=-DDEBUG=DEBUG_TEST
+CFLAGS=-g -Wall -I$(SRCDIR) -I. -I$(DEPSDIR) $(STATIC) $(COMPACT) $(DEBUG)
 LIBS=
 
 TESTS_SRC_C=$(wildcard t_*.c)

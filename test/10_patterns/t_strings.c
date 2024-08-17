@@ -42,4 +42,37 @@ tstsuite("Quoted strings") {
     tstcheck(skp(text,singleq,&to) == 0);
   }
 
+  tstcase("Simple string") {
+    text = "pippo";
+    tstcheck(skp(text,"'pippo'",&to) == 1);
+    tstcheck(skp(text,"'pippoxx'",&to) == 0);
+
+    tstcheck(skp(text,"'pluto'",&to) == 0);
+    
+  }
+
+  tstcase("Simple string") {
+    text = "pippo";
+    tstcheck(skp(text,"`pippo",&to) == 1);
+    tstcheck(skp(text,"`pippoxx",&to) == 0);
+
+    tstcheck(skp(text,"`pluto",&to) == 0);
+    
+  }
+
+  tstcase("Simple string") {
+    char *from;
+    text = "xy3";
+    tstcheck(skp(text,"?`xy","d",&from, &to) == 1);
+
+    text = "4";
+    tstcheck(skp(text,"?`xy","d",&from, &to) == 1);
+    
+    text = "av";
+    tstcheck(skp(text,"!`xy","ll",&from, &to) == 1);
+
+    text = "xy";
+    tstcheck(skp(text,"!`xy","ll",&from, &to) == 0);
+  }
+
 }

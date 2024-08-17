@@ -130,9 +130,12 @@ tstsuite("Basic Patterns")
     text = "xyz";
     tstcheck(skp(text,"s",&from,&to) == 0);
     tstcheck(skp(text,"!s",&from,&to) == 1);
-    text = "#abc";
+    text = "abc";
     tstcheck(skp(text,"s",&from,&to) == 0);
-    tstcheck(skp(text,"!s",&from,&to) == 1);   
+    tstcheck(skp(text,"!s",&from,&to) == 1);
+    tstcheck((int)(to-from) == 0,"start: %p from: %p to: %p",(void *)text, (void *)from, (void *)to);
+    tstcheck(skp(text,"*s",&from, &to) == 1);
+    tstcheck((int)(to-from) == 0);
   }
 
   tstcase("c  control"){
@@ -204,5 +207,34 @@ tstsuite("Basic Patterns")
     text = "è";
     tstcheck(skp(text,"!U.",&to)== 1);
     tstcheck((len = (int)(to-text)) == 1);
+  }
+
+  tstcase("Always match null string") {
+    text ="X";
+
+    tstcheck(skp(text,0,&to) == 1);
+    tstcheck((len = (int)(to-text)) == 0);
+    
+    tstcheck(skp(text,"",&to) == 1);
+    tstcheck((len = (int)(to-text)) == 0);
+    
+    tstcheck(skp(text,"*d",&to) == 1);
+    tstcheck((len = (int)(to-text)) == 0);
+    
+    tstcheck(skp(text,"!s",&to) == 1);
+    tstcheck((len = (int)(to-text)) == 0);
+    
+    text = "X3%%%";
+    tstcheck(skp(text,"&ad",&to) == 1);
+    tstcheck((len = (int)(to-text)) == 0,"start: %p to: %p",(void *)text, (void *)to);
+    
+    tstcheck(skp(text,"!&d3",&to) == 1);
+    tstcheck((len = (int)(to-text)) == 0,"start: %p to: %p",(void *)text, (void *)to);
+
+    text = "";
+    tstcheck(skp(text,".",&to) == 0);
+    tstcheck(skp(text,"!.",&to) == 1);
+    tstcheck((len = (int)(to-text)) == 0,"start: %p to: %p",(void *)text, (void *)to);
+
   }
 }

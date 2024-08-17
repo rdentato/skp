@@ -40,6 +40,11 @@ tstsuite("Multiple patterns") {
     tstcheck(strncmp("else",from[2],4) == 0);
   }    
 
+  tstcase("Numeric") {
+    text = "123pippo321x";
+    tstcheck(ret = skp(text,3,"'pippo'", 3, "'x'",from,to) == 1,"ret: %d",ret);
+  }
+
   tstcase("Not match") {
     text = "532";
     from[0] = (char *)from;

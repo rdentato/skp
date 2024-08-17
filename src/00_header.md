@@ -16,10 +16,11 @@
 
 #ifndef SKP_VERSION
 #define SKP_VERSION 0x0004001C
-#define SKP_VERSION_STR "0.4.0"
+#define SKP_VERSION_STR "0.4.1"
 
   @(":Standard Includes")
   @(":Utility macros")
+  @(":Global types")
   @(":Global Declarations")
   @(":Public API")
 
@@ -51,6 +52,9 @@ Visit the [`vrg` library](https://github.com/rdentato/vrg) site for more informa
 
 #define skp_VRG(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
 #define skp_Vrg(skp_v_f,...) skp_v_cat(skp_v_f, skp_v_argn(__VA_ARGS__))(__VA_ARGS__)
+
+
+
 
 ```
 
@@ -97,9 +101,11 @@ Visit the [`vrg` library](https://github.com/rdentato/vrg) site for more informa
 @("after:Global declarations")
 // Just a caution to avoid aggressive optimization.
 extern volatile int skp_zero;
+extern const char *skp_emptystr;
 
 @("after:Global variables")
 volatile int skp_zero = 0;
+const char *skp_emptystr = "";
 
 ```
 
