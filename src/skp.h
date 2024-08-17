@@ -48,12 +48,12 @@
   } while(0)
 
 #line 23 "00_header.md"
-#line 266 "10_patterns.md"
+#line 264 "10_patterns.md"
 typedef struct {int x;} *skp_goal_t;
 typedef struct {int y;} *skp_goalnot_t;
 
 
-#line 147 "20_scanner.md"
+#line 203 "20_scanner.md"
 typedef struct {
   char *start;
   char *from;
@@ -61,10 +61,9 @@ typedef struct {
   int alt;
 } skp_save_t;
 
-//extern skp_save_t *skp_save;
 
 #line 24 "00_header.md"
-#line 271 "10_patterns.md"
+#line 269 "10_patterns.md"
 extern skp_goal_t    skpgoal;
 extern skp_goalnot_t skpnot;
 
@@ -84,26 +83,11 @@ extern char *skpto[SKP_MAXPATTERNS]; // Write only!
 #line 76 "10_patterns.md"
 typedef int (*skp_funcpattern_t)(char *, char**, char **, int);
 
-#define skprecognizer(recog) \
+#define skpdef(recog) \
    int recog(char *skpstart, char **skpfrom, char **skpto, int skpmatched)
 
-#define skpdef(x) skprecognizer(x)
-
 #line 25 "00_header.md"
-#line 113 "20_scanner.md"
-typedef struct {
-  char  *start;
-  char  *from[SKP_MAXPATTERNS];
-  char  *to[SKP_MAXPATTERNS];
-  int    alt;
-  int    matched;
-} skp_info_t;
-
-
-#define skplen(n) skp_len(n,skpfrom, skpto)
-static inline int skp_len(int n, char **from, char **to) { return to[n] - from[n];}
-
-#line 84 "10_patterns.md"
+#line 82 "10_patterns.md"
 
 int skp_f(char *txt, skp_funcpattern_t f, char **from,char **end);
 int skp_s(char *txt, char *pat, char **from,char **end);
@@ -121,7 +105,7 @@ int skp_p(char *txt, void *p, char **from,char **end);
                         int: skp_n,\
                      void *: skp_p ) (s,p,f,t)
 
-#line 281 "10_patterns.md"
+#line 279 "10_patterns.md"
 #define skp_type(x) _Generic((x),char *: 'S', \
                       skp_funcpattern_t: 'F', \
                              skp_goal_t: 'G', \
@@ -167,20 +151,9 @@ uint32_t skp_next(char *text,char **end,int iso);
 #define skpnextISO_1(s)   skp_next(s,NULL,1)
 #define skpnextISO_2(s,e) skp_next(s,e,1)
 
-#line 85 "20_scanner.md"
+#line 185 "20_scanner.md"
 
-#define skp_scan_loop(s,t,r) \
-     for (skp_info_t skp_info = {.start = s, .alt =0, .matched = 0}; \
-          (skp_info.start && *skp_info.start && !skp_info.alt ); \
-          skp_info.alt = skp_info.alt? (((t)[0] = skp_info.start = skp_info.to[0]), r):1)
-
-#define skpscan(...)    skp_vrg(skpscan_,__VA_ARGS__)
-#define skpscan_1(s)    skpscan_2(s, skpto)
-#define skpscan_2(s,t)  skp_scan_loop(s,t,0)
-
-#define skpswitch(...)   skp_vrg(skpswitch_,__VA_ARGS__)
-#define skpswitch_1(s)   skipswitch_2(s, skpto)
-#define skpswitch_2(s,t) skp_scan_loop(s,t,1)
+#define skpscan(...)    skpgroup(__VA_ARGS__) manyskp
 
 #define skpgroup(...)    skp_vrg(skpgroup_,__VA_ARGS__)
 #define skpgroup_1(s)    skpgroup_3(s,skpto, &skpmatched)
@@ -189,17 +162,10 @@ uint32_t skp_next(char *text,char **end,int iso);
                               for (int skpmatched = -1; (skpmatched < 0) && (skpmatched = 1); skpmatched? (((t)[0] = skpto[0]) , ((r)[0] = skpmatched)) : 0)
 
 
-#line 129 "20_scanner.md"
+#define skplen(n) skp_len(n,skpfrom, skpto)
+static inline int skp_len(int n, char **from, char **to) { return to[n] - from[n];}
 
-#define skpcase(...) \
-  for(char **skpfrom = skp_info.from, **skpto = skp_info.to, *skpstart = skp_info.start; \
-      skpstart != NULL; skpstart = NULL) \
-    if (skp_info.alt || !((skp_info.alt = skp(skp_info.start, __VA_ARGS__ ,skpfrom,skpto)))) ;\
-    else
-
-#line 141 "20_scanner.md"
-#define skpscanner skprecognizer
-#line 160 "20_scanner.md"
+#line 212 "20_scanner.md"
 #define skp_save() {skpstart, *skpfrom, *skpto, (skpmatched = 1) }
 
 #define skp_restore() ((skpstart = skp_save.start, \
@@ -207,12 +173,12 @@ uint32_t skp_next(char *text,char **end,int iso);
                          *skpto = skp_save.to), \
                                   0)
 
-#define skpsetmatchstart() ((*skpfrom = skp_save.start),\
+#define skp_setmatchstart() ((*skpfrom = skp_save.start),\
                                         0)
 
 #define skp_do skp_save.alt
 
-#line 176 "20_scanner.md"
+#line 228 "20_scanner.md"
 
 #define ifskp(...) \
   for ( int skp_count = 1;\
@@ -228,8 +194,8 @@ uint32_t skp_next(char *text,char **end,int iso);
 #define elseskp \
   if (skpmatched || !(skpmatched = 1)) ; else 
 
-#define whileskp(...) \
-  if (!skpmatched) ; else \
+#define whileskp(...) manyskp ifskp(__VA_ARGS__)
+/*  if (!skpmatched) ; else \
     for ( int skp_count = 1;\
           \
           skp_count \
@@ -238,6 +204,8 @@ uint32_t skp_next(char *text,char **end,int iso);
           \
           skpstart = *skpto, \
           skp_count++ ) 
+*/
+
 /*
 //#define skp_1(p) \
 //  for ( int skp_count = 1;\
@@ -250,7 +218,7 @@ uint32_t skp_next(char *text,char **end,int iso);
 #define mustskp \
   if (!skpmatched) ; else for (skp_save_t skp_save = skp_save(); \
        skpmatched && skp_do; \
-       skp_do = skpmatched ? skpsetmatchstart() : skp_restore())
+       skp_do = skpmatched ? skp_setmatchstart() : skp_restore())
 
 #define notskp \
   if (!skpmatched) ; else for (skp_save_t skp_save = skp_save(); \
@@ -266,6 +234,11 @@ uint32_t skp_next(char *text,char **end,int iso);
   if (!skpmatched) ; else for (skpmatched = 0; \
        (skpmatched == 0) && (skpmatched = 1) ; \
        skpmatched = 1) mustskp
+
+#define manyskp \
+  if (!skpmatched) ; else for  (skp_save_t skp_save = skp_save(); \
+       skpmatched || ((skpmatched = (skp_do > 2) ? 1 : skp_restore()) && skp_zero) ; \
+       skp_do++) 
 
 #define orskp  if (skpmatched || !(skpmatched = 1)) ; else mustskp
 #define andskp if (!skpmatched) ; else
@@ -285,12 +258,9 @@ char *skpto[SKP_MAXPATTERNS]; // Write only!
 // char *skpstart = NULL;
 // int   skpmatched = 0;
 
-#line 277 "10_patterns.md"
+#line 275 "10_patterns.md"
 skp_goal_t    skpgoal;
 skp_goalnot_t skpnot;
-
-#line 157 "20_scanner.md"
-//skp_save_t *skp_save = &((skp_save_t){.matched = 0});
 
 #line 29 "00_header.md"
 #line 19 "10_patterns.md"
@@ -541,7 +511,7 @@ static uint32_t get_qclose(uint32_t open)
 #line 15 "15_match.md"
 // skp() needs to know about mathc()
 static int match(char *pat, char *txt, char **pat_end, char **txt_end,int *flg);
-#line 105 "10_patterns.md"
+#line 103 "10_patterns.md"
 int skp_f(char *txt, skp_funcpattern_t f, char **from,char **to)
 {
   char *local_from[SKP_MAXPATTERNS];
@@ -589,7 +559,7 @@ int skp_p(char *txt, void *p, char **from,char **to)
   if (to) *to = txt;
   return (1);
 }
-#line 156 "10_patterns.md"
+#line 154 "10_patterns.md"
 int skp_s(char *txt, char *pat, char **from,char **to)
 {
   char *start = txt;
@@ -601,15 +571,15 @@ int skp_s(char *txt, char *pat, char **from,char **to)
   int   ret = 0;
   int   flg = 0; // By default: Case sensitive comparison and UTF-8 encoding
 
-#line 466 "10_patterns.md"
+#line 464 "10_patterns.md"
   char *goal = NULL;
   char *goalnot = NULL;
 
-#line 168 "10_patterns.md"
+#line 166 "10_patterns.md"
 
   if (!pat || !txt) { return 0; }
 
-#line 486 "10_patterns.md"
+#line 484 "10_patterns.md"
 _skptrace("SKP_: txt:'%s' pat:'%s'",txt,pat);
 
   if (*pat == '>') {
@@ -618,7 +588,7 @@ _skptrace("SKP_: txt:'%s' pat:'%s'",txt,pat);
   }
 _skptrace("SKP_: txt:'%s' pat:'%s' skp_to:%d",txt,pat,skp_to);
 
-#line 172 "10_patterns.md"
+#line 170 "10_patterns.md"
 
   p = pat;
   s = start;
@@ -637,23 +607,23 @@ _skptrace("SKP_: txt:'%s' pat:'%s' skp_to:%d",txt,pat,skp_to);
     matched = match(p,s,&p_end,&s_end,&flg); 
 
     if (matched) {
-#line 435 "10_patterns.md"
+#line 433 "10_patterns.md"
 _skptrace("matched( '%s' '%s'",s,p);
  s = s_end;
  p = p_end;
 _skptrace("matched) '%s' '%s'",s,p);
-#line 470 "10_patterns.md"
+#line 468 "10_patterns.md"
 if (matched == MATCHED_GOAL && !goalnot && !goal) {
   goal = s_end;  skptrace("GOAL: %.4s",s_end);
 }
 else if (matched == MATCHED_GOALNOT && !goalnot && !goal) { 
   goalnot = s_end; skptrace("!GOAL: %.4s",s_end);
 }
-#line 191 "10_patterns.md"
+#line 189 "10_patterns.md"
     }
     else {
-#line 386 "10_patterns.md"
-#line 394 "10_patterns.md"
+#line 384 "10_patterns.md"
+#line 392 "10_patterns.md"
      _skptrace("notmatched  '%s' '%s'",s,p);
       // Skip over the current sub-pattern
       while (*p > '\7') p++;
@@ -663,8 +633,8 @@ else if (matched == MATCHED_GOALNOT && !goalnot && !goal) {
         p++;
        _skptrace("resume from: %s (%c)", p,*s);
       }
-#line 387 "10_patterns.md"
-#line 409 "10_patterns.md"
+#line 385 "10_patterns.md"
+#line 407 "10_patterns.md"
       else if (skp_to) {
         goal = NULL;  goalnot = NULL;
         p = pat;
@@ -674,18 +644,18 @@ else if (matched == MATCHED_GOALNOT && !goalnot && !goal) {
         if (*s == '\0') break;
       }
 
-#line 388 "10_patterns.md"
-#line 425 "10_patterns.md"
+#line 386 "10_patterns.md"
+#line 423 "10_patterns.md"
        else break;
-#line 389 "10_patterns.md"
-#line 194 "10_patterns.md"
+#line 387 "10_patterns.md"
+#line 192 "10_patterns.md"
     }
     while (is_space(*p)) p++; // skip useless spaces in the pattern
   }
 
  _skptrace("pat: '%s'",p);
 
-#line 216 "10_patterns.md"
+#line 214 "10_patterns.md"
   if (!matched && goalnot) {
     goal = goalnot;
     matched = MATCHED;
@@ -694,8 +664,8 @@ else if (matched == MATCHED_GOALNOT && !goalnot && !goal) {
   }
 
   if (goal) s = goal; // Move back the end of the string to the goal
-#line 201 "10_patterns.md"
-#line 232 "10_patterns.md"
+#line 199 "10_patterns.md"
+#line 230 "10_patterns.md"
   if (matched) { 
     ret = "\1\1\2\3\4\5\6\7"[(int)(*p) & 0x07]; // 0 defaults to 1
 
@@ -708,12 +678,12 @@ else if (matched == MATCHED_GOALNOT && !goalnot && !goal) {
     // *to  = txt;
   }
 
-#line 202 "10_patterns.md"
+#line 200 "10_patterns.md"
 
   return (ret);
 }
 #line 22 "10_patterns.md"
-#line 314 "10_patterns.md"
+#line 312 "10_patterns.md"
 int skp_multi(char *text,char **from, char **to, char *types, void **ptrns)
 {
  _skptrace("MULTI TYPES: %s",types);
@@ -1120,29 +1090,26 @@ uint32_t skp_next(char *text,char **end,int iso)
 #line 101 "00_header.md"
 #line 18 "10_patterns.md"
 #line 63 "10_patterns.md"
-#line 104 "10_patterns.md"
-#line 155 "10_patterns.md"
-#line 215 "10_patterns.md"
-#line 231 "10_patterns.md"
-#line 264 "10_patterns.md"
+#line 102 "10_patterns.md"
+#line 153 "10_patterns.md"
+#line 213 "10_patterns.md"
+#line 229 "10_patterns.md"
+#line 262 "10_patterns.md"
 
-#line 385 "10_patterns.md"
-#line 393 "10_patterns.md"
-#line 408 "10_patterns.md"
-#line 424 "10_patterns.md"
-#line 434 "10_patterns.md"
-#line 465 "10_patterns.md"
-#line 485 "10_patterns.md"
+#line 383 "10_patterns.md"
+#line 391 "10_patterns.md"
+#line 406 "10_patterns.md"
+#line 422 "10_patterns.md"
+#line 432 "10_patterns.md"
+#line 463 "10_patterns.md"
+#line 483 "10_patterns.md"
 #line 14 "15_match.md"
 #line 25 "15_match.md"
 #line 49 "15_match.md"
 #line 346 "15_match.md"
 #line 614 "15_match.md"
 #line 671 "15_match.md"
-#line 83 "20_scanner.md"
+#line 183 "20_scanner.md"
 
-#line 112 "20_scanner.md"
-#line 128 "20_scanner.md"
-#line 140 "20_scanner.md"
-#line 146 "20_scanner.md"
-#line 175 "20_scanner.md"
+#line 202 "20_scanner.md"
+#line 227 "20_scanner.md"

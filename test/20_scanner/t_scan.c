@@ -2,7 +2,7 @@
 #define SKP_MAIN
 #include "skp.h"
 
-skprecognizer(identifier)
+skpdef(identifier)
 {
   char *st = skpstart;
   char *nd = skpstart;
@@ -20,7 +20,7 @@ skprecognizer(identifier)
   return ret;
 }
 
-skprecognizer(number)
+skpdef(number)
 {
   char *st = skpstart;
   char *nd = skpstart;
@@ -47,11 +47,11 @@ tstsuite("Scan") {
     text = "ab423xy?";
     next = text;
     skpscan(next,&next) {
-      skpcase("+a") { 
+      ifskp("+a") { 
         tstcheck(skplen(0) == 2);
         tstnote("ALPHA: %.*s",skplen(0),skpfrom[0]); 
       }
-      skpcase("+d") { 
+      elseifskp("+d") { 
         tstcheck(skplen(0) == 3);
         tstnote("DIGITS: %.*s",skplen(0),skpfrom[0]); 
       }
@@ -62,12 +62,12 @@ tstsuite("Scan") {
     next = text;
     count = 0;
     skpscan(next,&next) {
-      skpcase("+a") { 
+      ifskp("+a") { 
         tstcheck(skplen(0) == 2);
         tstnote("ALPHA: %.*s",skplen(0),skpfrom[0]); 
         count++;
       }
-      skpcase("+d") { 
+      elseifskp("+d") { 
         tstcheck(skplen(0) == 3);
         tstnote("DIGITS: %.*s",skplen(0),skpfrom[0]); 
         count++;
@@ -79,12 +79,12 @@ tstsuite("Scan") {
     next = text;
     count = 0;
     skpscan(next) {
-      skpcase("+a") { 
+      ifskp("+a") { 
         tstcheck(skplen(0) == 2);
         tstnote("ALPHA: %.*s",skplen(0),skpfrom[0]); 
         count++;
       }
-      skpcase("+d") { 
+      elseifskp("+d") { 
         tstcheck(skplen(0) == 3);
         tstnote("DIGITS: %.*s",skplen(0),skpfrom[0]); 
         count++;
@@ -94,17 +94,71 @@ tstsuite("Scan") {
     tstcheck(count == 3);
   }
 
+  tstcase("Matching scan (with whileskp)") {
+    text = "ab423xy?";
+    next = text;
+    skpgroup(next,&next) {
+      manyskp {
+        ifskp("+a") { 
+          tstcheck(skplen(0) == 2);
+          tstnote("ALPHA: %.*s",skplen(0),skpfrom[0]); 
+        }
+        elseifskp("+d") { 
+          tstcheck(skplen(0) == 3);
+          tstnote("DIGITS: %.*s",skplen(0),skpfrom[0]); 
+        }
+      }
+    }
+    tstcheck(*next == '?');
+
+    text = "ab423xy";
+    next = text;
+    count = 0;
+    skpgroup(next,&next) manyskp {
+      ifskp("+a") { 
+        tstcheck(skplen(0) == 2);
+        tstnote("ALPHA: %.*s",skplen(0),skpfrom[0]); 
+        count++;
+      }
+      elseifskp("+d") { 
+        tstcheck(skplen(0) == 3);
+        tstnote("DIGITS: %.*s",skplen(0),skpfrom[0]); 
+        count++;
+      }
+    }
+    tstcheck(*next == '\0');
+    tstcheck(count == 3);
+
+    next = text;
+    count = 0;
+    skpscan(next) {
+      ifskp("+a") { 
+        tstcheck(skplen(0) == 2);
+        tstnote("ALPHA: %.*s",skplen(0),skpfrom[0]); 
+        count++;
+      }
+      elseifskp("+d") { 
+        tstcheck(skplen(0) == 3);
+        tstnote("DIGITS: %.*s",skplen(0),skpfrom[0]); 
+        count++;
+      }
+    }
+    tstcheck(*next == *text);
+    tstcheck(count == 3, "Count = %d",count);
+  }
+
+
   tstcase("Non matching switch") {
     text = "?ab423xy";
     next = text;
     count = 0;
     skpscan(next,&next) {
-      skpcase("+a") { 
+      ifskp("+a") { 
         tstcheck(skplen(0) == 2);
         tstnote("ALPHA: %.*s",skplen(0),skpfrom[0]); 
         count++;
       }
-      skpcase("+d") { 
+      elseifskp("+d") { 
         tstcheck(skplen(0) == 3);
         tstnote("DIGITS: %.*s",skplen(0),skpfrom[0]); 
         count++;
@@ -119,12 +173,12 @@ tstsuite("Scan") {
     next = text;
     count = 0;
     skpscan(next,&next) {
-      skpcase("S '(' S",identifier,"S ')' S") { 
+      ifskp("S '(' S",identifier,"S ')' S") { 
         tstcheck(skplen(2) == 5);
         tstnote("id: %.*s",skplen(2),skpfrom[2]); 
         count++;
       }
-      skpcase("S '(' S",number,"S ')' S") { 
+      elseifskp("S '(' S",number,"S ')' S") { 
         tstcheck(skplen(2) == 1);
         tstnote("num: %.*s",skplen(2),skpfrom[2]); 
         count++;

@@ -2,13 +2,13 @@
 #define SKP_MAIN
 #include "skp.h"
   
-skprecognizer(singleq)
+skpdef(singleq)
 {
    if (*skpstart != '\'') return 0;
    else return skp(skpstart,"Q",skpfrom, skpto);
 }
 
-skprecognizer(doubleq)
+skpdef(doubleq)
 {
    if (*skpstart != '"') return 0;
    else return skp(skpstart,"Q",skpfrom, skpto);

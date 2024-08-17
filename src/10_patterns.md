@@ -75,10 +75,8 @@ char *skpto[SKP_MAXPATTERNS]; // Write only!
 @("after: Global Declarations")
 typedef int (*skp_funcpattern_t)(char *, char**, char **, int);
 
-#define skprecognizer(recog) \
+#define skpdef(recog) \
    int recog(char *skpstart, char **skpfrom, char **skpto, int skpmatched)
-
-#define skpdef(x) skprecognizer(x)
 
 @("after:Public API")
 

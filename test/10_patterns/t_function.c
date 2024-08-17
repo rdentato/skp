@@ -2,7 +2,7 @@
 #define SKP_MAIN
 #include "skp.h"
   
-skprecognizer(is_keyword)
+skpdef(is_keyword)
 {
   *skpfrom = skpstart;
   *skpfrom = skpstart;
